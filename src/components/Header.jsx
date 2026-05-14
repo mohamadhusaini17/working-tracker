@@ -28,12 +28,12 @@ export default function Header({ editMode, onEditMode, onMenu }) {
 
       // 3. Paksa pindah halaman ke /login
       // Menggunakan replace agar user tidak bisa klik tombol 'Back' untuk masuk lagi
-      window.location.replace('/login')
+      window.location.replace('/auth')
 
     } catch (error) {
       console.error('Error logging out:', error.message)
       // Jika error sekalipun (misal masalah jaringan), tetap lempar ke halaman login
-      window.location.replace('/login')
+      window.location.replace('/auth')
     }
   }
 
