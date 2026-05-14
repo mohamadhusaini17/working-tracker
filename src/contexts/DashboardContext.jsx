@@ -18,19 +18,18 @@ export function DashboardProvider({ children }) {
         const { data, error } = await supabase
           .from('teams')
           .select('*')
-          .order('created_at', { ascending: true });
+          .order('id', { ascending: true });
 
         if (error) throw error;
 
         if (data) {
           setTeams(data);
-          // Set team pertama jadi aktif jika belum ada yang terpilih
           if (data.length > 0 && !activeTeam) {
             setActiveTeam(data[0].id);
           }
         }
       } catch (err) {
-        console.error('Error loading teams:', err.message);
+        console.error('Error fetching teams:', err.message);
       } finally {
         setLoading(false);
       }
@@ -42,18 +41,18 @@ export function DashboardProvider({ children }) {
   const selectDate = (d) => { setSelDate(d); setSelPIC(null); };
   const selectTeam = (id) => { setActiveTeam(id); setSelDate(null); setSelPIC(null); };
 
-  // Logika memproses PIC agar Dashboard tidak pecah saat data kosong
+  // --- LOGIKA PIC DENGAN PENGAMAN (OPTIONAL CHAINING) ---
   const allPICs = useMemo(() => {
     const s = new Set();
-    teams.forEach(t => {
-      if (t.activities && Array.isArray(t.activities)) {
-        t.activities.forEach(a => { if (a.pic) s.add(a.pic); });
-      }
+    // Menggunakan ?. agar tidak error saat data sedang loading/kosong
+    teams?.forEach(t => {
+      t.activities?.forEach(a => {
+        if (a.pic) s.add(a.pic);
+      });
     });
     return [...s].sort();
   }, [teams]);
 
-  // Ekspor fungsi dan state
   const value = {
     teams,
     setTeams,
