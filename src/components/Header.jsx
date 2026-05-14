@@ -6,6 +6,8 @@ import ProfileModal      from './modals/ProfileModal.jsx'
 import SettingsModal     from './modals/SettingsModal.jsx'
 import ConnectEmailModal from './modals/ConnectEmailModal.jsx'
 import { useIsMobile }   from '../hooks/useIsMobile.js'
+// Import Supabase
+import { supabase } from '../lib/supabase'
 
 export default function Header({ editMode, onEditMode, onMenu }) {
   const isMobile = useIsMobile()
@@ -13,6 +15,27 @@ export default function Header({ editMode, onEditMode, onMenu }) {
   const [profileOpen,  setProfileOpen]  = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [emailOpen,    setEmailOpen]    = useState(false)
+
+  // --- FUNGSI LOGOUT FINAL (LIVE VERSION) ---
+  const handleLogout = async () => {
+    try {
+      // 1. Hapus session di server Supabase
+      await supabase.auth.signOut()
+      
+      // 2. Bersihkan storage browser secara paksa
+      localStorage.clear()
+      sessionStorage.clear()
+
+      // 3. Paksa pindah halaman ke /login
+      // Menggunakan replace agar user tidak bisa klik tombol 'Back' untuk masuk lagi
+      window.location.replace('/login')
+
+    } catch (error) {
+      console.error('Error logging out:', error.message)
+      // Jika error sekalipun (misal masalah jaringan), tetap lempar ke halaman login
+      window.location.replace('/login')
+    }
+  }
 
   return (
     <>
@@ -68,11 +91,16 @@ export default function Header({ editMode, onEditMode, onMenu }) {
               </button>
             }
             items={[
-              { label: 'Profile',          icon: <User     size={14} />, onClick: () => setProfileOpen(true)  },
+              { label: 'Profile',          icon: <User      size={14} />, onClick: () => setProfileOpen(true)  },
               { label: 'Settings',         icon: <Settings size={14} />, onClick: () => setSettingsOpen(true) },
-              { label: 'Connect by Email', icon: <Mail     size={14} />, onClick: () => setEmailOpen(true)    },
+              { label: 'Connect by Email', icon: <Mail      size={14} />, onClick: () => setEmailOpen(true)    },
               'sep',
-              { label: 'Logout', icon: <LogOut size={14} />, danger: true },
+              { 
+                label: 'Logout', 
+                icon: <LogOut size={14} />, 
+                danger: true,
+                onClick: handleLogout // Menjalankan fungsi logout yang sudah diperbaiki
+              },
             ]}
           />
         </div>
