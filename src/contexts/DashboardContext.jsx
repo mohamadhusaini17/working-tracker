@@ -22,14 +22,18 @@ export function DashboardProvider({ children }) {
 
         if (error) throw error;
 
-        if (data) {
+        if (data && data.length > 0) {
           setTeams(data);
-          if (data.length > 0 && !activeTeam) {
-            setActiveTeam(data[0].id);
+          // PENGAMAN UTAMA: Menggunakan ?.id agar jika data[0] tidak terbaca, aplikasi tidak crash
+          if (!activeTeam) {
+            setActiveTeam(data[0]?.id || null);
           }
+        } else {
+          setTeams([]);
         }
       } catch (err) {
         console.error('Error fetching teams:', err.message);
+        setTeams([]);
       } finally {
         setLoading(false);
       }
@@ -41,15 +45,20 @@ export function DashboardProvider({ children }) {
   const selectDate = (d) => { setSelDate(d); setSelPIC(null); };
   const selectTeam = (id) => { setActiveTeam(id); setSelDate(null); setSelPIC(null); };
 
-  // --- LOGIKA PIC DENGAN PENGAMAN (OPTIONAL CHAINING) ---
+  // --- LOGIKA PIC DENGAN PENGAMAN DOUBLE VALIDASI ---
   const allPICs = useMemo(() => {
     const s = new Set();
-    // Menggunakan ?. agar tidak error saat data sedang loading/kosong
-    teams?.forEach(t => {
-      t.activities?.forEach(a => {
-        if (a.pic) s.add(a.pic);
+    // Memastikan teams benar-benar sebuah array sebelum melakukan looping
+    if (Array.isArray(teams)) {
+      teams.forEach(t => {
+        // Mengamankan jika kolom 'activities' di Supabase bernilai null atau bukan array
+        if (t && Array.isArray(t.activities)) {
+          t.activities.forEach(a => {
+            if (a && a.pic) s.add(a.pic);
+          });
+        }
       });
-    });
+    }
     return [...s].sort();
   }, [teams]);
 
