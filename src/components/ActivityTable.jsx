@@ -1,4 +1,7 @@
-import { useState, useMemo } from 'react'
+/**
+ * ActivityTable.jsx — Production Secure Version (Fully Featured)
+ */
+import React, { useState, useMemo } from 'react'
 import { Search, Plus, ArrowUpDown, Pencil, Trash2, FileText, File, FileSpreadsheet, FileIcon, Activity } from 'lucide-react'
 import { useDash } from '../contexts/DashboardContext.jsx'
 import { ProgBar } from './ui/ProgBar.jsx'
@@ -12,7 +15,21 @@ import DocPreviewModal from './modals/DocPreviewModal.jsx'
 import { cn } from '../constants/helpers.js'
 import { PRIORITY_CLS, STATUS_CLS, DOC_META, picHue, picInit } from '../constants/colors.js'
 
-const DOC_ICONS = { doc: FileText, pdf: File, excel: FileSpreadsheet, csv: FileIcon }
+// Fungsi pembantu untuk merender ikon dokumen secara aman dari jangkauan minifier
+function RenderDocIcon({ docType }) {
+  switch (docType) {
+    case 'doc':
+      return <FileText size={16} className={DOC_META.doc?.color || 'text-blue-400'} />
+    case 'pdf':
+      return <File size={16} className={DOC_META.pdf?.color || 'text-red-400'} />
+    case 'excel':
+      return <FileSpreadsheet size={16} className={DOC_META.excel?.color || 'text-emerald-400'} />
+    case 'csv':
+      return <FileIcon size={16} className={DOC_META.csv?.color || 'text-teal-400'} />
+    default:
+      return <File size={16} className="text-slate-400" />
+  }
+}
 
 function SortBtn({ col, label, sortCol, sortDir, onSort }) {
   return (
@@ -26,7 +43,7 @@ function SortBtn({ col, label, sortCol, sortDir, onSort }) {
   )
 }
 
-export default function ActivityTable({ activities, teamId }) {
+export default function ActivityTable({ activities = [], teamId }) {
   const { addAct, editAct, deleteAct, updateDoc, selDate } = useDash()
 
   const [q,        setQ]        = useState('')
@@ -39,16 +56,24 @@ export default function ActivityTable({ activities, teamId }) {
   const [mode,     setMode]     = useState('add')
   const [toast,    setToast]    = useState(null)
 
-  const filtered = activities.filter(a =>
-    a.kegiatan.toLowerCase().includes(q.toLowerCase()) ||
-    a.pic.toLowerCase().includes(q.toLowerCase()) ||
-    a.kategoriKerja.toLowerCase().includes(q.toLowerCase())
-  )
+  const safeActivities = Array.isArray(activities) ? activities : []
+
+  const filtered = useMemo(() => {
+    return safeActivities.filter(a => {
+      if (!a) return false
+      const ket = (a.kegiatan || '').toLowerCase()
+      const p   = (a.pic || '').toLowerCase()
+      const kat = (a.kategoriKerja || '').toLowerCase()
+      const query = q.toLowerCase()
+      return ket.includes(query) || p.includes(query) || kat.includes(query)
+    })
+  }, [safeActivities, q])
 
   const sorted = useMemo(() => {
     if (!sortCol) return filtered
     return [...filtered].sort((a, b) => {
-      const av = a[sortCol], bv = b[sortCol]
+      const av = a[sortCol] ?? ''
+      const bv = b[sortCol] ?? ''
       return typeof av === 'string'
         ? sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
         : sortDir === 'asc' ? av - bv : bv - av
@@ -80,7 +105,7 @@ export default function ActivityTable({ activities, teamId }) {
   ]
 
   // ── Empty state ─────────────────────────────────────────────────
-  if (activities.length === 0) return (
+  if (safeActivities.length === 0) return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-end">
         <Btn onClick={openAdd}><Plus size={16} />Tambah Aktivitas</Btn>
@@ -135,8 +160,8 @@ export default function ActivityTable({ activities, teamId }) {
                 </tr>
               ) : sorted.map(a => (
                 <tr key={a.id} className="tbl-row group">
-                  <td className="px-4 py-3 font-mono text-slate-400 text-xs">{a.jamMulai}</td>
-                  <td className="px-4 py-3 font-mono text-slate-400 text-xs">{a.jamSelesai}</td>
+                  <td className="px-4 py-3 font-mono text-slate-400 text-xs">{a.jamMulai || '-'}</td>
+                  <td className="px-4 py-3 font-mono text-slate-400 text-xs">{a.jamSelesai || '-'}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <div
@@ -145,54 +170,56 @@ export default function ActivityTable({ activities, teamId }) {
                       >
                         {picInit(a.pic)}
                       </div>
-                      <span className="text-xs text-slate-400 truncate max-w-24">{a.pic.split('@')[0]}</span>
+                      <span className="text-xs text-slate-400 truncate max-w-24">
+                        {a.pic ? a.pic.split('@')[0] : '-'}
+                      </span>
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={cn('inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-semibold', PRIORITY_CLS[a.priority])}>
-                      {a.priority}
+                    <span className={cn('inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-semibold', PRIORITY_CLS[a.priority] || 'bg-slate-800 text-slate-400')}>
+                      {a.priority || 'P1'}
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-slate-200 text-xs block max-w-56 line-clamp-2">{a.kegiatan}</span>
+                    <span className="text-slate-200 text-xs block max-w-56 line-clamp-2">{a.kegiatan || '-'}</span>
                   </td>
-                  <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{a.kategoriKerja}</td>
+                  <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{a.kategoriKerja || '-'}</td>
                   <td className="px-4 py-3">
-                    <span className={cn('inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-semibold', STATUS_CLS[a.status])}>
-                      {a.status}
+                    <span className={cn('inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-semibold', STATUS_CLS[a.status] || 'bg-slate-800 text-slate-400')}>
+                      {a.status || 'Not Progress'}
                     </span>
                   </td>
-                  <td className="px-4 py-3"><ProgBar v={a.progress} /></td>
-                  {/* Documents */}
+                  <td className="px-4 py-3"><ProgBar v={a.progress || 0} /></td>
+                  
+                  {/* Documents Column */}
                   <td className="px-4 py-3">
                     <div className="flex gap-1 flex-wrap">
                       {Object.entries(a.documents || {}).map(([dt, doc]) => {
-                        const m  = DOC_META[dt];  if (!m) return null
-                        const DI = DOC_ICONS[dt]
-                        return doc.uploaded
-                          ? (
-                            <Tip key={dt} label={`Preview: ${doc.name}`}>
-                              <button
-                                onClick={() => handlePreview(dt, doc.name)}
-                                className="btn-ghost p-1.5 rounded-lg"
-                              >
-                                <DI size={16} className={m.color} />
-                              </button>
-                            </Tip>
-                          ) : (
-                            <Tip key={dt} label={`Upload ${dt.toUpperCase()}`}>
-                              <DocBtn
-                                docType={dt}
-                                docData={doc}
-                                onUpload={(_, data) => handleUpload(a.id, dt, data)}
-                                onPreview={handlePreview}
-                              />
-                            </Tip>
-                          )
+                        if (!DOC_META[dt]) return null
+                        return doc?.uploaded ? (
+                          <Tip key={dt} label={`Preview: ${doc.name}`}>
+                            <button
+                              onClick={() => handlePreview(dt, doc.name)}
+                              className="btn-ghost p-1.5 rounded-lg flex items-center justify-center"
+                            >
+                              <RenderDocIcon docType={dt} />
+                            </button>
+                          </Tip>
+                        ) : (
+                          <Tip key={dt} label={`Upload ${dt.toUpperCase()}`}>
+                            <DocBtn
+                              docType={dt}
+                              docData={doc}
+                              onUpload={(_, data) => handleUpload(a.id, dt, data)}
+                              onPreview={handlePreview}
+                            />
+                          </Tip>
+                        )
                       })}
                     </div>
                   </td>
-                  {/* Actions */}
+
+                  {/* Actions Column */}
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Tip label="Edit">
@@ -212,14 +239,14 @@ export default function ActivityTable({ activities, teamId }) {
 
       {/* Footer */}
       <div className="flex items-center justify-between text-xs text-slate-600 px-1">
-        <span>{sorted.length} dari {activities.length} aktivitas</span>
+        <span>{sorted.length} dari {safeActivities.length} aktivitas</span>
         <div className="flex gap-3">
-          <span>Selesai: <span className="text-emerald-400 font-semibold">{activities.filter(a => a.status === 'Done').length}</span></span>
-          <span>On Prog: <span className="text-blue-400 font-semibold">{activities.filter(a => a.status === 'On Progress').length}</span></span>
+          <span>Selesai: <span className="text-emerald-400 font-semibold">{safeActivities.filter(a => a?.status === 'Done').length}</span></span>
+          <span>On Prog: <span className="text-blue-400 font-semibold">{safeActivities.filter(a => a?.status === 'In Progress' || a?.status === 'On Progress').length}</span></span>
         </div>
       </div>
 
-      {/* Modals & overlays */}
+      {/* Modals & Overlays */}
       <ActivityForm open={formOpen} onClose={() => setFormOpen(false)} activity={selAct} onSave={save} mode={mode} defaultDate={selDate} />
       <DelDialog
         open={delOpen}
