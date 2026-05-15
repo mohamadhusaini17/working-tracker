@@ -10,7 +10,7 @@ export function DashboardProvider({ children }) {
   const [selPIC, setSelPIC] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // --- FETCH DATA DARI SUPABASE ---
+  // --- 1. AMBIL DATA REAL-TIME DARI SUPABASE ---
   useEffect(() => {
     const fetchTeams = async () => {
       try {
@@ -24,6 +24,7 @@ export function DashboardProvider({ children }) {
 
         if (data && data.length > 0) {
           setTeams(data);
+          // Set team pertama secara otomatis sebagai default aktif jika belum ada
           if (!activeTeam) {
             setActiveTeam(data[0]?.id || null);
           }
@@ -41,24 +42,24 @@ export function DashboardProvider({ children }) {
     fetchTeams();
   }, []);
 
-  // ─── FUNGSI SELEKTOR & GETTER UTAMA YANG DICARI APP.JSX ───
-
   const selectDate = (d) => { setSelDate(d); setSelPIC(null); };
   const selectTeam = (id) => { setActiveTeam(id); setSelDate(null); setSelPIC(null); };
 
-  // 1. Ambil data tim aktif saat ini
+  // ─── 2. FUNGSI GETTER DATA DENGAN PENGAMAN ANTI-CRASH ───
+
+  // Mengambil data tim aktif saat ini
   const getTeam = () => {
     return teams.find(t => t.id === activeTeam) || null;
   };
 
-  // 2. Ambil aktivitas berdasarkan tanggal spesifik
+  // Mengambil aktivitas berdasarkan tanggal (Aman dari data null/undefined)
   const getActsByDate = (teamId, date) => {
     const target = teams.find(t => t.id === teamId);
     if (!target || !Array.isArray(target.activities)) return [];
     return target.activities.filter(a => a && a.date === date);
   };
 
-  // 3. Ambil rangkuman performa PIC pada tanggal spesifik
+  // Mengambil rangkuman performa PIC pada tanggal spesifik
   const getPICs = (teamId, date) => {
     const acts = getActsByDate(teamId, date);
     const summary = {};
@@ -77,11 +78,11 @@ export function DashboardProvider({ children }) {
       pic: p.pic,
       tasks: p.total,
       done: p.done,
-      avgProgress: Math.round(p.progressSum / p.total)
+      avgProgress: p.total > 0 ? Math.round(p.progressSum / p.total) : 0
     }));
   };
 
-  // 4. Kalkulator Rangkuman Statistik untuk Komponen Card & Chart
+  // Kalkulator Rangkuman Statistik untuk Card & Chart (Aman 100%)
   const getStats = (teamId, date, pic) => {
     const target = teams.find(t => t.id === teamId);
     let acts = target && Array.isArray(target.activities) ? target.activities : [];
@@ -99,7 +100,7 @@ export function DashboardProvider({ children }) {
     return { total, done, onProg, p1, p2, p3 };
   };
 
-  // ─── FUNGSI AKSI MUTASI DATA (PENGAMAN AMAN) ───
+  // ─── 3. FUNGSI MUTASI DATA KE SUPABASE ───
   const addAct = async (teamId, newAct) => {
     try {
       const targetTeam = teams.find(t => t.id === teamId);
@@ -110,7 +111,7 @@ export function DashboardProvider({ children }) {
       const { error } = await supabase.from('teams').update({ activities: updatedActs }).eq('id', teamId);
       if (error) throw error;
       setTeams(prev => prev.map(t => t.id === teamId ? { ...t, activities: updatedActs } : t));
-    } catch (err) { console.error(err.message); }
+    } catch (err) { console.error('Error adding activity:', err.message); }
   };
 
   const editAct = async (teamId, actId, updatedData) => {
@@ -123,7 +124,7 @@ export function DashboardProvider({ children }) {
       const { error } = await supabase.from('teams').update({ activities: updatedActs }).eq('id', teamId);
       if (error) throw error;
       setTeams(prev => prev.map(t => t.id === teamId ? { ...t, activities: updatedActs } : t));
-    } catch (err) { console.error(err.message); }
+    } catch (err) { console.error('Error editing activity:', err.message); }
   };
 
   const deleteAct = async (teamId, actId) => {
@@ -136,7 +137,7 @@ export function DashboardProvider({ children }) {
       const { error } = await supabase.from('teams').update({ activities: updatedActs }).eq('id', teamId);
       if (error) throw error;
       setTeams(prev => prev.map(t => t.id === teamId ? { ...t, activities: updatedActs } : t));
-    } catch (err) { console.error(err.message); }
+    } catch (err) { console.error('Error deleting activity:', err.message); }
   };
 
   const updateDoc = async (teamId, actId, docType, docData) => {
@@ -159,10 +160,10 @@ export function DashboardProvider({ children }) {
       const { error } = await supabase.from('teams').update({ activities: updatedActs }).eq('id', teamId);
       if (error) throw error;
       setTeams(prev => prev.map(t => t.id === teamId ? { ...t, activities: updatedActs } : t));
-    } catch (err) { console.error(err.message); }
+    } catch (err) { console.error('Error updating document:', err.message); }
   };
 
-  // --- LOGIKA PIC LIST ---
+  // --- 4. LOGIKA PENCARIAN PIC LIST VIA MEMO ---
   const allPICs = useMemo(() => {
     const s = new Set();
     if (Array.isArray(teams)) {
@@ -179,7 +180,7 @@ export function DashboardProvider({ children }) {
     teams, setTeams, activeTeam, setActiveTeam,
     selDate, setSelDate, selPIC, setSelPIC,
     selectDate, selectTeam, allPICs, loading,
-    getTeam, getActsByDate, getPICs, getStats, // SINKRONISASI COCOK 100% DENGAN APP.JSX
+    getTeam, getActsByDate, getPICs, getStats, 
     addAct, editAct, deleteAct, updateDoc
   };
 
