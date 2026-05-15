@@ -1,58 +1,81 @@
-import { ChevronRight } from 'lucide-react'
-import Card from './ui/Card.jsx'
-import { ProgBarFull } from './ui/ProgBar.jsx'
+/**
+ * PICCard.jsx — Production Secure Version
+ */
+import React from 'react'
+import { CheckCircle2, AlertCircle, Clock, TrendingUp } from 'lucide-react'
 import { picHue, picInit } from '../constants/colors.js'
 
-export default function PICCard({ picData, onClick }) {
-  const done  = picData.acts.filter(a => a.status === 'Done').length
-  const inPg  = picData.acts.filter(a => a.status === 'On Progress').length
-  const p0    = picData.acts.filter(a => a.priority === 'P0').length
-  const pct   = picData.acts.length > 0 ? Math.round(done / picData.acts.length * 100) : 0
-  const name  = picData.pic.split('@')[0]
+export default function PICCard({ picName, activities = [], onSelect }) {
+  const safeActs = Array.isArray(activities) ? activities : []
+  
+  const total = safeActs.length
+  const done = safeActs.filter(a => a?.status === 'Done').length
+  const progress = safeActs.filter(a => a?.status === 'In Progress').length
+  const pending = safeActs.filter(a => a?.status === 'Not Progress').length
+
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0
+  const displayName = picName ? picName.split('@')[0] : 'Unknown'
 
   return (
-    <Card onClick={onClick} className="p-5 group">
-      {/* Header */}
-      <div className="flex items-start gap-4">
-        <div
-          className="w-12 h-12 rounded-2xl flex items-center justify-center text-white text-sm font-black flex-shrink-0 shadow-lg"
-          style={{ backgroundColor: picHue(picData.pic) }}
-        >
-          {picInit(picData.pic)}
+    <div 
+      onClick={onSelect}
+      style={{
+        background: '#111827', border: '1px solid #1e2d4a', borderRadius: '12px',
+        padding: '12px', cursor: 'pointer', transition: 'all .2s ease'
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.borderColor = '#3b82f6'
+        e.currentTarget.style.transform = 'translateY(-2px)'
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.borderColor = '#1e2d4a'
+        e.currentTarget.style.transform = 'none'
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+        <div style={{
+          width: '32px', height: '32px', borderRadius: '8px',
+          background: picHue(picName), display: 'flex', alignItems: 'center',
+          justifyContent: 'center', color: 'white', fontWeight: 800, fontSize: '12px'
+        }}>
+          {picInit(picName)}
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-bold text-sm text-slate-100 capitalize group-hover:text-blue-300 transition-colors">{name}</p>
-          <p className="text-xs text-slate-600 mt-0.5 truncate">{picData.pic}</p>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {displayName}
+          </h4>
+          <p style={{ margin: 0, fontSize: '10px', color: '#64748b' }}>{total} Tugas</p>
         </div>
-        <ChevronRight size={16} className="text-slate-700 group-hover:text-blue-400 flex-shrink-0 mt-1 transition-colors" />
+        <div style={{ textAlign: 'right' }}>
+          <span style={{ fontSize: '14px', fontWeight: 800, color: pct === 100 ? '#10b981' : '#3b82f6' }}>
+            {pct}%
+          </span>
+        </div>
       </div>
 
-      {/* Mini stats */}
-      <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-        {[['Total', picData.acts.length, 'text-slate-100'], ['Selesai', done, 'text-emerald-400'], ['P0', p0, p0 > 0 ? 'text-red-400' : 'text-slate-700']].map(([lbl, val, vc]) => (
-          <div key={lbl} className="pic-stat">
-            <p className={`text-lg font-black tabular-nums ${vc}`}>{val}</p>
-            <p className="text-[10px] text-slate-600">{lbl}</p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', background: '#0b0f19', padding: '6px', borderRadius: '8px' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', color: '#10b981' }}>
+            <CheckCircle2 size={10} />
+            <span style={{ fontSize: '11px', fontWeight: 700 }}>{done}</span>
           </div>
-        ))}
-      </div>
-
-      {/* Completion bar */}
-      <div className="mt-3">
-        <div className="flex justify-between text-[10px] text-slate-600 mb-1">
-          <span>Completion</span>
-          <span className="font-bold text-blue-400">{pct}%</span>
+          <span style={{ fontSize: '8px', color: '#475569', textTransform: 'uppercase' }}>Done</span>
         </div>
-        <ProgBarFull v={pct} />
-      </div>
-
-      {/* Active tasks indicator */}
-      {inPg > 0 && (
-        <div className="mt-2.5 flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse block" />
-          <span className="text-[11px] text-blue-400 font-medium">{inPg} tugas berjalan</span>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', color: '#3b82f6' }}>
+            <Clock size={10} />
+            <span style={{ fontSize: '11px', fontWeight: 700 }}>{progress}</span>
+          </div>
+          <span style={{ fontSize: '8px', color: '#475569', textTransform: 'uppercase' }}>WIP</span>
         </div>
-      )}
-    </Card>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', color: '#ef4444' }}>
+            <AlertCircle size={10} />
+            <span style={{ fontSize: '11px', fontWeight: 700 }}>{pending}</span>
+          </div>
+          <span style={{ fontSize: '8px', color: '#475569', textTransform: 'uppercase' }}>Stuck</span>
+        </div>
+      </div>
+    </div>
   )
 }

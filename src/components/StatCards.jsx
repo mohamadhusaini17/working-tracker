@@ -1,77 +1,45 @@
-import { Activity, CheckCircle2, Clock, AlertCircle, GripVertical } from 'lucide-react'
-import Card from './ui/Card.jsx'
-import { cn } from '../constants/helpers.js'
+/**
+ * StatCards.jsx — Production Secure Version
+ */
+import React from 'react'
+import * as Icons from 'lucide-react'
 
-function StatCard({ icon: Icon, label, value, sub, valueClass, iconClass, editMode }) {
+function StatCard({ title, value, sub, iconName, color }) {
+  // Amankan resolusi ikon dari pemecahan akibat uglify/minifier
+  const targetIcon = Icons[iconName] || Icons.HelpCircle
+
   return (
-    <Card className={cn('p-5 relative', editMode && 'ring-2 ring-blue-500/30 ring-dashed')}>
-      {editMode && (
-        <div className="absolute -top-2 -left-2 bg-blue-600 rounded-full p-1">
-          <GripVertical size={12} className="text-white" />
-        </div>
-      )}
-      <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center mb-3', iconClass)}>
-        <Icon size={16} />
+    <div style={{ background: '#111827', border: '1px solid #1e2d4a', borderRadius: '12px', padding: '14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div style={{
+        width: '36px', height: '36px', borderRadius: '9px',
+        background: `${color}15`, display: 'flex', alignItems: 'center',
+        justifyContent: 'center', color: color, flexShrink: 0
+      }}>
+        {React.createElement(targetIcon, { size: 18 })}
       </div>
-      <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">{label}</p>
-      <p className={cn('text-3xl font-black mt-1 tabular-nums', valueClass)}>{value}</p>
-      <p className="text-xs text-slate-700 mt-0.5">{sub}</p>
-    </Card>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <p style={{ margin: 0, fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</p>
+        <h3 style={{ margin: '2px 0 0', fontSize: '20px', fontWeight: 800, color: '#f8fafc', lineHeight: 1 }}>{value}</h3>
+        {sub && <p style={{ margin: '2px 0 0', fontSize: '10px', color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</p>}
+      </div>
+    </div>
   )
 }
 
-// Ganti baris ini di src/components/StatCards.jsx Anda:
-export default function StatCards({ stats = { total: 0, done: 0, inProg: 0, p0: 0 }, selPIC, selDate, editMode }) {
-  // Tambahkan juga optional chaining (?.) untuk proteksi ganda
-  const safeStats = {
-    total: stats?.total || 0,
-    done: stats?.done || 0,
-    inProg: stats?.inProg || 0,
-    p0: stats?.p0 || 0
-  }
-
-  const pct = safeStats.total > 0 ? Math.round(safeStats.done / safeStats.total * 100) : 0
-
-  const cards = [
-    {
-      icon:       Activity,
-      label:      'Total',
-      value:      safeStats.total,
-      sub:        selPIC ? 'aktivitas PIC' : selDate ? 'hari ini' : 'semua waktu',
-      valueClass: 'text-slate-100',
-      iconClass:  'ic-slate',
-    },
-    {
-      icon:       CheckCircle2,
-      label:      'Selesai',
-      value:      safeStats.done,
-      sub:        `${pct}% rate`,
-      valueClass: 'text-emerald-400',
-      iconClass:  'ic-em',
-    },
-    {
-      icon:       Clock,
-      label:      'Dalam Proses',
-      value:      safeStats.inProg,
-      sub:        'Tugas aktif',
-      valueClass: 'text-blue-400',
-      iconClass:  'ic-bl',
-    },
-    {
-      icon:       AlertCircle,
-      label:      'Prioritas P0',
-      value:      safeStats.p0,
-      sub:        'Kritis',
-      valueClass: safeStats.p0 > 0 ? 'text-red-400' : 'text-slate-700',
-      iconClass:  safeStats.p0 > 0 ? 'ic-rd' : 'ic-dim',
-    },
-  ]
+export default function StatCards({ activities = [] }) {
+  const safeActs = Array.isArray(activities) ? activities : []
+  
+  const total = safeActs.length
+  const done = safeActs.filter(a => a?.status === 'Done').length
+  const wip = safeActs.filter(a => a?.status === 'In Progress').length
+  const p0 = safeActs.filter(a => a?.priority === 'P0').length
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      {cards.map(c => (
-        <StatCard key={c.label} {...c} editMode={editMode} />
-      ))}
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', marginBottom: '16px' }}>
+      <StatCard title="Total Tugas" value={total} sub="Semua riwayat terdaftar" iconName="Folder" color="#3b82f6" />
+      <StatCard title="Selesai (Done)" value={done} sub={`${total > 0 ? Math.round((done/total)*100) : 0}% rasio penyelesaian`} iconName="CheckCircle2" color="#10b981" />
+      <StatCard title="Dalam Proses" value={wip} sub="Sedang dikerjakan PIC" iconName="Clock" color="#f59e0b" />
+      <StatCard title="Urgensi P0" value={p0} sub="Butuh tindakan segera" iconName="AlertTriangle" color="#ef4444" />
     </div>
   )
 }
