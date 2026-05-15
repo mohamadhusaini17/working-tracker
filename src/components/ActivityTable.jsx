@@ -55,6 +55,7 @@ export default function ActivityTable({ activities = [], teamId }) {
   const [mode,     setMode]     = useState('add')
   const [toast,    setToast]    = useState(null)
 
+  // Memastikan data activities selalu berupa array
   const safeActivities = Array.isArray(activities) ? activities : []
 
   const filtered = useMemo(() => {
@@ -103,10 +104,10 @@ export default function ActivityTable({ activities = [], teamId }) {
     ['kegiatan','Kegiatan'], ['kategoriKerja','Kategori'], ['status','Status'], ['progress','Progress'],
   ]
 
-  // Default meta dokumen jika data dari DB kosong agar perulangan tidak crash
+  // Skema default untuk pengaman kolom dokumen
   const DEFAULT_DOCS_SCHEME = { doc: {}, pdf: {}, excel: {}, csv: {} }
 
-  // ── Empty state ─────────────────────────────────────────────────
+  // ── Empty State ─────────────────────────────────────────────────
   if (safeActivities.length === 0) return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-end">
@@ -160,23 +161,26 @@ export default function ActivityTable({ activities = [], teamId }) {
                     Tidak ada hasil untuk "<span className="text-slate-400">{q}</span>"
                   </td>
                 </tr>
-              ) : sorted.map(a => {
-                // Proteksi struktural data dokumen agar tidak merusak React loop komponen anak
+              ) : sorted.map((a, index) => {
+                // 1. Amankan ID (Jika id dari database kosong/null, gunakan index array sebagai key)
+                const safeId = a?.id || `fallback-act-${index}`;
+
+                // 2. Amankan skema objek dokumen dari data Supabase yang korup / tidak lengkap
                 const currentDocs = a?.documents && typeof a.documents === 'object' && Object.keys(a.documents).length > 0
                   ? a.documents 
                   : DEFAULT_DOCS_SCHEME;
 
                 return (
-                  <tr key={a.id} className="tbl-row group">
+                  <tr key={safeId} className="tbl-row group">
                     <td className="px-4 py-3 font-mono text-slate-400 text-xs">{a.jamMulai || '-'}</td>
                     <td className="px-4 py-3 font-mono text-slate-400 text-xs">{a.jamSelesai || '-'}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <div
                           className="w-6 h-6 rounded-lg flex items-center justify-center text-white font-black flex-shrink-0"
-                          style={{ backgroundColor: picHue(a.pic), fontSize: '9px' }}
+                          style={{ backgroundColor: picHue(a.pic || 'P'), fontSize: '9px' }}
                         >
-                          {picInit(a.pic)}
+                          {picInit(a.pic || 'P')}
                         </div>
                         <span className="text-xs text-slate-400 truncate max-w-24">
                           {a.pic ? a.pic.split('@')[0] : '-'}
@@ -199,7 +203,7 @@ export default function ActivityTable({ activities = [], teamId }) {
                     </td>
                     <td className="px-4 py-3"><ProgBar v={a.progress || 0} /></td>
                     
-                    {/* Documents Column - Proteksi Penuh Terhadap Data Kosong di DB */}
+                    {/* Documents Column */}
                     <td className="px-4 py-3">
                       <div className="flex gap-1 flex-wrap">
                         {Object.entries(currentDocs).map(([dt, doc]) => {
@@ -218,7 +222,7 @@ export default function ActivityTable({ activities = [], teamId }) {
                               <DocBtn
                                 docType={dt}
                                 docData={doc || {}}
-                                onUpload={(_, data) => handleUpload(a.id, dt, data)}
+                                onUpload={(_, data) => handleUpload(safeId, dt, data)}
                                 onPreview={handlePreview}
                               />
                             </Tip>
@@ -260,7 +264,7 @@ export default function ActivityTable({ activities = [], teamId }) {
       <DelDialog
         open={delOpen}
         onClose={() => setDelOpen(false)}
-        onConfirm={() => selAct && deleteAct(teamId, selAct.id)}
+        onConfirm={() => selAct && deleteAct(teamId, selAct.id || '')}
         title="Hapus Aktivitas"
         desc={selAct ? `Yakin hapus "${selAct.kegiatan}"?` : ''}
       />
