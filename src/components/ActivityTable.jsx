@@ -1,5 +1,5 @@
 /**
- * ActivityTable.jsx — Production Secure Version (Fully Featured)
+ * ActivityTable.jsx — Production Secure Version (Fully Featured & Data-Defensive)
  */
 import React, { useState, useMemo } from 'react'
 import { Search, Plus, ArrowUpDown, Pencil, Trash2, FileText, File, FileSpreadsheet, FileIcon, Activity } from 'lucide-react'
@@ -15,7 +15,6 @@ import DocPreviewModal from './modals/DocPreviewModal.jsx'
 import { cn } from '../constants/helpers.js'
 import { PRIORITY_CLS, STATUS_CLS, DOC_META, picHue, picInit } from '../constants/colors.js'
 
-// Fungsi pembantu untuk merender ikon dokumen secara aman dari jangkauan minifier
 function RenderDocIcon({ docType }) {
   switch (docType) {
     case 'doc':
@@ -51,7 +50,7 @@ export default function ActivityTable({ activities = [], teamId }) {
   const [sortDir,  setSortDir]  = useState('asc')
   const [formOpen, setFormOpen] = useState(false)
   const [delOpen,  setDelOpen]  = useState(false)
-  const [preview,  setPreview]  = useState(null)   // { docType, fileName }
+  const [preview,  setPreview]  = useState(null)
   const [selAct,   setSelAct]   = useState(null)
   const [mode,     setMode]     = useState('add')
   const [toast,    setToast]    = useState(null)
@@ -103,6 +102,9 @@ export default function ActivityTable({ activities = [], teamId }) {
     ['jamMulai','Mulai'], ['jamSelesai','Selesai'], ['pic','PIC'], ['priority','Prior.'],
     ['kegiatan','Kegiatan'], ['kategoriKerja','Kategori'], ['status','Status'], ['progress','Progress'],
   ]
+
+  // Default meta dokumen jika data dari DB kosong agar perulangan tidak crash
+  const DEFAULT_DOCS_SCHEME = { doc: {}, pdf: {}, excel: {}, csv: {} }
 
   // ── Empty state ─────────────────────────────────────────────────
   if (safeActivities.length === 0) return (
@@ -158,80 +160,87 @@ export default function ActivityTable({ activities = [], teamId }) {
                     Tidak ada hasil untuk "<span className="text-slate-400">{q}</span>"
                   </td>
                 </tr>
-              ) : sorted.map(a => (
-                <tr key={a.id} className="tbl-row group">
-                  <td className="px-4 py-3 font-mono text-slate-400 text-xs">{a.jamMulai || '-'}</td>
-                  <td className="px-4 py-3 font-mono text-slate-400 text-xs">{a.jamSelesai || '-'}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-6 h-6 rounded-lg flex items-center justify-center text-white font-black flex-shrink-0"
-                        style={{ backgroundColor: picHue(a.pic), fontSize: '9px' }}
-                      >
-                        {picInit(a.pic)}
-                      </div>
-                      <span className="text-xs text-slate-400 truncate max-w-24">
-                        {a.pic ? a.pic.split('@')[0] : '-'}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={cn('inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-semibold', PRIORITY_CLS[a.priority] || 'bg-slate-800 text-slate-400')}>
-                      {a.priority || 'P1'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="text-slate-200 text-xs block max-w-56 line-clamp-2">{a.kegiatan || '-'}</span>
-                  </td>
-                  <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{a.kategoriKerja || '-'}</td>
-                  <td className="px-4 py-3">
-                    <span className={cn('inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-semibold', STATUS_CLS[a.status] || 'bg-slate-800 text-slate-400')}>
-                      {a.status || 'Not Progress'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3"><ProgBar v={a.progress || 0} /></td>
-                  
-                  {/* Documents Column */}
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1 flex-wrap">
-                      {Object.entries(a.documents || {}).map(([dt, doc]) => {
-                        if (!DOC_META[dt]) return null
-                        return doc?.uploaded ? (
-                          <Tip key={dt} label={`Preview: ${doc.name}`}>
-                            <button
-                              onClick={() => handlePreview(dt, doc.name)}
-                              className="btn-ghost p-1.5 rounded-lg flex items-center justify-center"
-                            >
-                              <RenderDocIcon docType={dt} />
-                            </button>
-                          </Tip>
-                        ) : (
-                          <Tip key={dt} label={`Upload ${dt.toUpperCase()}`}>
-                            <DocBtn
-                              docType={dt}
-                              docData={doc}
-                              onUpload={(_, data) => handleUpload(a.id, dt, data)}
-                              onPreview={handlePreview}
-                            />
-                          </Tip>
-                        )
-                      })}
-                    </div>
-                  </td>
+              ) : sorted.map(a => {
+                // Proteksi struktural data dokumen agar tidak merusak React loop komponen anak
+                const currentDocs = a?.documents && typeof a.documents === 'object' && Object.keys(a.documents).length > 0
+                  ? a.documents 
+                  : DEFAULT_DOCS_SCHEME;
 
-                  {/* Actions Column */}
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Tip label="Edit">
-                        <Btn variant="ghost" size="icon-sm" onClick={() => openEdit(a)}><Pencil size={14} /></Btn>
-                      </Tip>
-                      <Tip label="Hapus">
-                        <Btn variant="ghost" size="icon-sm" onClick={() => openDel(a)}><Trash2 size={14} /></Btn>
-                      </Tip>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                return (
+                  <tr key={a.id} className="tbl-row group">
+                    <td className="px-4 py-3 font-mono text-slate-400 text-xs">{a.jamMulai || '-'}</td>
+                    <td className="px-4 py-3 font-mono text-slate-400 text-xs">{a.jamSelesai || '-'}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-6 h-6 rounded-lg flex items-center justify-center text-white font-black flex-shrink-0"
+                          style={{ backgroundColor: picHue(a.pic), fontSize: '9px' }}
+                        >
+                          {picInit(a.pic)}
+                        </div>
+                        <span className="text-xs text-slate-400 truncate max-w-24">
+                          {a.pic ? a.pic.split('@')[0] : '-'}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={cn('inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-semibold', PRIORITY_CLS[a.priority] || 'bg-slate-800 text-slate-400')}>
+                        {a.priority || 'P1'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-slate-200 text-xs block max-w-56 line-clamp-2">{a.kegiatan || '-'}</span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{a.kategoriKerja || '-'}</td>
+                    <td className="px-4 py-3">
+                      <span className={cn('inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-semibold', STATUS_CLS[a.status] || 'bg-slate-800 text-slate-400')}>
+                        {a.status || 'Not Progress'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3"><ProgBar v={a.progress || 0} /></td>
+                    
+                    {/* Documents Column - Proteksi Penuh Terhadap Data Kosong di DB */}
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1 flex-wrap">
+                        {Object.entries(currentDocs).map(([dt, doc]) => {
+                          if (!DOC_META[dt]) return null
+                          return doc?.uploaded ? (
+                            <Tip key={dt} label={`Preview: ${doc.name}`}>
+                              <button
+                                onClick={() => handlePreview(dt, doc.name)}
+                                className="btn-ghost p-1.5 rounded-lg flex items-center justify-center"
+                              >
+                                <RenderDocIcon docType={dt} />
+                              </button>
+                            </Tip>
+                          ) : (
+                            <Tip key={dt} label={`Upload ${dt.toUpperCase()}`}>
+                              <DocBtn
+                                docType={dt}
+                                docData={doc || {}}
+                                onUpload={(_, data) => handleUpload(a.id, dt, data)}
+                                onPreview={handlePreview}
+                              />
+                            </Tip>
+                          )
+                        })}
+                      </div>
+                    </td>
+
+                    {/* Actions Column */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Tip label="Edit">
+                          <Btn variant="ghost" size="icon-sm" onClick={() => openEdit(a)}><Pencil size={14} /></Btn>
+                        </Tip>
+                        <Tip label="Hapus">
+                          <Btn variant="ghost" size="icon-sm" onClick={() => openDel(a)}><Trash2 size={14} /></Btn>
+                        </Tip>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

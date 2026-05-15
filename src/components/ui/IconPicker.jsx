@@ -1,56 +1,28 @@
-import React from 'react'
-import { 
-  BarChart3, ShieldAlert, ClipboardCheck, PackageSearch, 
-  ShieldCheck, FileWarning, FileText, FolderPlus, Home 
-} from 'lucide-react'
-import { cn } from '../../constants/helpers.js'
-
-const OPTS = [
-  { n: 'Home',           I: Home },
-  { n: 'BarChart3',      I: BarChart3 },
-  { n: 'ShieldAlert',    I: ShieldAlert },
-  { n: 'ClipboardCheck', I: ClipboardCheck },
-  { n: 'PackageSearch',  I: PackageSearch },
-  { n: 'ShieldCheck',    I: ShieldCheck },
-  { n: 'FileWarning',    I: FileWarning },
-  { n: 'FileText',       I: FileText },
-  { n: 'FolderPlus',     I: FolderPlus },
-]
-
-export const ICON_MAP = Object.fromEntries(OPTS.map(({ n, I }) => [n, I]))
-
 /**
- * Mengambil komponen ikon secara aman dan tahan dari bug minifikasi produksi
+ * IconPicker.jsx — Production Secure Mapping Version
  */
-export const getIcon = (name) => {
-  if (!name) return FolderPlus
+import * as Icons from 'lucide-react'
 
-  // Cari berdasarkan nama asli atau versi huruf kecil (case-insensitive)
-  const foundIcon = ICON_MAP[name] || 
-                    ICON_MAP[name.charAt(0).toUpperCase() + name.slice(1)] || 
-                    ICON_MAP['Home'] // Jika di database tertulis 'home', arahkan ke ikon Home
-
-  // Proteksi utama: Pastikan yang dikembalikan adalah komponen React fungsional yang valid
-  if (typeof foundIcon === 'function' || (foundIcon && typeof foundIcon.$$typeof === 'symbol')) {
-    return foundIcon
-  }
-
-  return FolderPlus
+const iconMapping = {
+  'home': Icons.Home,
+  'bar-chart': Icons.BarChart3,
+  'folder': Icons.Folder,
+  'users': Icons.Users,
+  'settings': Icons.Settings,
+  'database': Icons.Database,
+  'layers': Icons.Layers,
+  'check-square': Icons.CheckSquare,
+  'calendar': Icons.Calendar,
+  'file-text': Icons.FileText,
+  'briefcase': Icons.Briefcase,
+  'terminal': Icons.Terminal,
+  'code': Icons.Code
 }
 
-export default function IconPicker({ value, onChange }) {
-  return (
-    <div className="grid grid-cols-4 gap-2 mt-1.5">
-      {OPTS.map(({ n, I }) => (
-        <button 
-          key={n} 
-          type="button" 
-          onClick={() => onChange(n)} 
-          className={cn('ic-opt', value === n && 'selected')}
-        >
-          <I size={20} />
-        </button>
-      ))}
-    </div>
-  )
+export function getIcon(iconName) {
+  if (!iconName) return Icons.Folder
+  const cleanKey = String(iconName).toLowerCase().trim()
+  return iconMapping[cleanKey] || Icons.Folder
 }
+
+export default getIcon

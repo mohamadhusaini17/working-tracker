@@ -2,12 +2,9 @@
  * StatCards.jsx — Production Secure Version
  */
 import React from 'react'
-import * as Icons from 'lucide-react'
+import { Folder, CheckCircle2, Clock, AlertTriangle } from 'lucide-react'
 
-function StatCard({ title, value, sub, iconName, color }) {
-  // Amankan resolusi ikon dari pemecahan akibat uglify/minifier
-  const targetIcon = Icons[iconName] || Icons.HelpCircle
-
+function StatCard({ title, value, sub, iconComponent, color }) {
   return (
     <div style={{ background: '#111827', border: '1px solid #1e2d4a', borderRadius: '12px', padding: '14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
       <div style={{
@@ -15,7 +12,7 @@ function StatCard({ title, value, sub, iconName, color }) {
         background: `${color}15`, display: 'flex', alignItems: 'center',
         justifyContent: 'center', color: color, flexShrink: 0
       }}>
-        {React.createElement(targetIcon, { size: 18 })}
+        {iconComponent}
       </div>
       <div style={{ minWidth: 0, flex: 1 }}>
         <p style={{ margin: 0, fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</p>
@@ -36,10 +33,10 @@ export default function StatCards({ activities = [] }) {
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', marginBottom: '16px' }}>
-      <StatCard title="Total Tugas" value={total} sub="Semua riwayat terdaftar" iconName="Folder" color="#3b82f6" />
-      <StatCard title="Selesai (Done)" value={done} sub={`${total > 0 ? Math.round((done/total)*100) : 0}% rasio penyelesaian`} iconName="CheckCircle2" color="#10b981" />
-      <StatCard title="Dalam Proses" value={wip} sub="Sedang dikerjakan PIC" iconName="Clock" color="#f59e0b" />
-      <StatCard title="Urgensi P0" value={p0} sub="Butuh tindakan segera" iconName="AlertTriangle" color="#ef4444" />
+      <StatCard title="Total Tugas" value={total} sub="Semua riwayat terdaftar" iconComponent={<Folder size={18} />} color="#3b82f6" />
+      <StatCard title="Selesai (Done)" value={done} sub={`${total > 0 ? Math.round((done/total)*100) : 0}% rasio penyelesaian`} iconComponent={<CheckCircle2 size={18} />} color="#10b981" />
+      <StatCard title="Dalam Proses" value={wip} sub="Sedang dikerjakan PIC" iconComponent={<Clock size={18} />} color="#f59e0b" />
+      <StatCard title="Urgensi P0" value={p0} sub="Butuh tindakan segera" iconComponent={<AlertTriangle size={18} />} color="#ef4444" />
     </div>
   )
 }
