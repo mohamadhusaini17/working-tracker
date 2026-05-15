@@ -10,7 +10,7 @@ export function DashboardProvider({ children }) {
   const [selPIC, setSelPIC] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // --- 1. AMBIL DATA REAL-TIME DARI SUPABASE ---
+  // --- FETCH DATA AMAN DENGAN AUTO-TRANSFORMER FIELD JALUR REAL-TIME ---
   useEffect(() => {
     const fetchTeams = async () => {
       try {
@@ -23,10 +23,52 @@ export function DashboardProvider({ children }) {
         if (error) throw error;
 
         if (data && data.length > 0) {
-          setTeams(data);
-          // Set team pertama secara otomatis sebagai default aktif jika belum ada
-          if (!activeTeam) {
-            setActiveTeam(data[0]?.id || null);
+          // Proses pembersihan data agar kebal dari missing fields / data null
+          const sanitizedData = data.map(team => {
+            let acts = team.activities;
+            
+            // 1. Jika bertipe string text, paksa parse ke Array objek
+            if (typeof acts === 'string') {
+              try { acts = JSON.parse(acts); } catch { acts = []; }
+            }
+            
+            // 2. Pastikan mutlak berbentuk Array standar JavaScript
+            if (!Array.isArray(acts)) {
+              acts = [];
+            }
+
+            // 3. Rekonstruksi struktur aktivitas agar sesuai ekspektasi komponen visual UI
+            const safeActs = acts.map(a => {
+              if (!a) return null;
+              return {
+                id: a.id || `act-${Date.now()}`,
+                pic: a.pic || '',
+                status: a.status || 'In Progress',
+                jamMulai: a.jamMulai || '08:00',
+                jamSelesai: a.jamSelesai || '17:00',
+                kegiatan: a.kegiatan || '',
+                priority: a.priority || 'P2', 
+                progress: typeof a.progress === 'number' ? a.progress : Number(a.progress) || 0,
+                kategoriKerja: a.kategoriKerja || 'General',
+                // JIKA DI SUPABASE TIDAK ADA PROPERTI DATE, PAKSA PAKAI TANGGAL HARI INI
+                date: a.date || new Date().toISOString().split('T')[0], 
+                documents: a.documents || {
+                  csv: { name: '', uploaded: false },
+                  doc: { name: '', uploaded: false },
+                  pdf: { name: '', uploaded: false },
+                  excel: { name: '', uploaded: false }
+                }
+              };
+            }).filter(Boolean); // Buang data jika ada objek ilegal atau bernilai null
+
+            return { ...team, activities: safeActs };
+          });
+
+          setTeams(sanitizedData);
+          
+          // Set team pertama secara otomatis sebagai default aktif jika belum dipilih
+          if (!activeTeam && sanitizedData[0]) {
+            setActiveTeam(sanitizedData[0].id);
           }
         } else {
           setTeams([]);
@@ -40,26 +82,22 @@ export function DashboardProvider({ children }) {
     };
 
     fetchTeams();
-  }, []);
+  }, [activeTeam]);
 
   const selectDate = (d) => { setSelDate(d); setSelPIC(null); };
   const selectTeam = (id) => { setActiveTeam(id); setSelDate(null); setSelPIC(null); };
 
-  // ─── 2. FUNGSI GETTER DATA DENGAN PENGAMAN ANTI-CRASH ───
-
-  // Mengambil data tim aktif saat ini
+  // --- FUNGSI GETTER DATA DENGAN PENGAMAN KETAT ---
   const getTeam = () => {
     return teams.find(t => t.id === activeTeam) || null;
   };
 
-  // Mengambil aktivitas berdasarkan tanggal (Aman dari data null/undefined)
   const getActsByDate = (teamId, date) => {
     const target = teams.find(t => t.id === teamId);
     if (!target || !Array.isArray(target.activities)) return [];
     return target.activities.filter(a => a && a.date === date);
   };
 
-  // Mengambil rangkuman performa PIC pada tanggal spesifik
   const getPICs = (teamId, date) => {
     const acts = getActsByDate(teamId, date);
     const summary = {};
@@ -82,7 +120,6 @@ export function DashboardProvider({ children }) {
     }));
   };
 
-  // Kalkulator Rangkuman Statistik untuk Card & Chart (Aman 100%)
   const getStats = (teamId, date, pic) => {
     const target = teams.find(t => t.id === teamId);
     let acts = target && Array.isArray(target.activities) ? target.activities : [];
@@ -100,7 +137,7 @@ export function DashboardProvider({ children }) {
     return { total, done, onProg, p1, p2, p3 };
   };
 
-  // ─── 3. FUNGSI MUTASI DATA KE SUPABASE ───
+  // --- FUNGSI AKSI MUTASI DATA KE SUPABASE SERVER ---
   const addAct = async (teamId, newAct) => {
     try {
       const targetTeam = teams.find(t => t.id === teamId);
@@ -163,7 +200,6 @@ export function DashboardProvider({ children }) {
     } catch (err) { console.error('Error updating document:', err.message); }
   };
 
-  // --- 4. LOGIKA PENCARIAN PIC LIST VIA MEMO ---
   const allPICs = useMemo(() => {
     const s = new Set();
     if (Array.isArray(teams)) {
