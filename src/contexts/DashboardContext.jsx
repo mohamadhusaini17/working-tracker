@@ -10,7 +10,7 @@ export function DashboardProvider({ children }) {
   const [selPIC, setSelPIC] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // --- FETCH DATA AMAN DENGAN AUTO-TRANSFORMER FIELD JALUR REAL-TIME ---
+  // --- 1. AMBIL DATA DAN TRANSFORMAASI STRUKTUR AGAR DIJAMIN AMAN ---
   useEffect(() => {
     const fetchTeams = async () => {
       try {
@@ -23,34 +23,31 @@ export function DashboardProvider({ children }) {
         if (error) throw error;
 
         if (data && data.length > 0) {
-          // Proses pembersihan data agar kebal dari missing fields / data null
           const sanitizedData = data.map(team => {
             let acts = team.activities;
             
-            // 1. Jika bertipe string text, paksa parse ke Array objek
             if (typeof acts === 'string') {
               try { acts = JSON.parse(acts); } catch { acts = []; }
             }
             
-            // 2. Pastikan mutlak berbentuk Array standar JavaScript
             if (!Array.isArray(acts)) {
               acts = [];
             }
 
-            // 3. Rekonstruksi struktur aktivitas agar sesuai ekspektasi komponen visual UI
             const safeActs = acts.map(a => {
               if (!a) return null;
+              // MEMAKSA SEMUA FIELD STRUKTUR TERSEDIA SECARA MUTLAK
               return {
                 id: a.id || `act-${Date.now()}`,
-                pic: a.pic || '',
+                pic: a.pic || 'Anonim',
                 status: a.status || 'In Progress',
                 jamMulai: a.jamMulai || '08:00',
                 jamSelesai: a.jamSelesai || '17:00',
-                kegiatan: a.kegiatan || '',
+                kegiatan: a.kegiatan || 'Aktivitas Tanpa Nama',
                 priority: a.priority || 'P2', 
                 progress: typeof a.progress === 'number' ? a.progress : Number(a.progress) || 0,
                 kategoriKerja: a.kategoriKerja || 'General',
-                // JIKA DI SUPABASE TIDAK ADA PROPERTI DATE, PAKSA PAKAI TANGGAL HARI INI
+                // Amankan format tanggal agar tidak merusak fungsi split/manipulasi string komponen UI
                 date: a.date || new Date().toISOString().split('T')[0], 
                 documents: a.documents || {
                   csv: { name: '', uploaded: false },
@@ -59,14 +56,12 @@ export function DashboardProvider({ children }) {
                   excel: { name: '', uploaded: false }
                 }
               };
-            }).filter(Boolean); // Buang data jika ada objek ilegal atau bernilai null
+            }).filter(Boolean);
 
             return { ...team, activities: safeActs };
           });
 
           setTeams(sanitizedData);
-          
-          // Set team pertama secara otomatis sebagai default aktif jika belum dipilih
           if (!activeTeam && sanitizedData[0]) {
             setActiveTeam(sanitizedData[0].id);
           }
@@ -84,24 +79,27 @@ export function DashboardProvider({ children }) {
     fetchTeams();
   }, [activeTeam]);
 
-  const selectDate = (d) => { setSelDate(d); setSelPIC(null); };
-  const selectTeam = (id) => { setActiveTeam(id); setSelDate(null); setSelPIC(null); };
+  const selectDate = (d) => { setSelDate(d || new Date().toISOString().split('T')[0]); setSelPIC(null); };
+  const selectTeam = (id) => { setActiveTeam(id); setSelDate(new Date().toISOString().split('T')[0]); setSelPIC(null); };
 
-  // --- FUNGSI GETTER DATA DENGAN PENGAMAN KETAT ---
+  // --- 2. GETTER DENGAN PROSES PENYARINGAN EKSTRA AMAN ---
   const getTeam = () => {
-    return teams.find(t => t.id === activeTeam) || null;
+    return teams.find(t => t.id === activeTeam) || { id: 'fallback', name: 'Loading Team...', activities: [] };
   };
 
   const getActsByDate = (teamId, date) => {
     const target = teams.find(t => t.id === teamId);
     if (!target || !Array.isArray(target.activities)) return [];
-    return target.activities.filter(a => a && a.date === date);
+    
+    const targetDate = date || new Date().toISOString().split('T')[0];
+    return target.activities.filter(a => a && a.date === targetDate);
   };
 
   const getPICs = (teamId, date) => {
     const acts = getActsByDate(teamId, date);
-    const summary = {};
+    if (!acts.length) return [];
     
+    const summary = {};
     acts.forEach(a => {
       if (!a || !a.pic) return;
       if (!summary[a.pic]) {
@@ -124,7 +122,8 @@ export function DashboardProvider({ children }) {
     const target = teams.find(t => t.id === teamId);
     let acts = target && Array.isArray(target.activities) ? target.activities : [];
 
-    if (date) acts = acts.filter(a => a && a.date === date);
+    const targetDate = date || new Date().toISOString().split('T')[0];
+    if (targetDate) acts = acts.filter(a => a && a.date === targetDate);
     if (pic) acts = acts.filter(a => a && a.pic === pic);
 
     const total = acts.length;
@@ -137,7 +136,7 @@ export function DashboardProvider({ children }) {
     return { total, done, onProg, p1, p2, p3 };
   };
 
-  // --- FUNGSI AKSI MUTASI DATA KE SUPABASE SERVER ---
+  // --- 3. AKSI MUTASI AMAN ---
   const addAct = async (teamId, newAct) => {
     try {
       const targetTeam = teams.find(t => t.id === teamId);
@@ -148,7 +147,7 @@ export function DashboardProvider({ children }) {
       const { error } = await supabase.from('teams').update({ activities: updatedActs }).eq('id', teamId);
       if (error) throw error;
       setTeams(prev => prev.map(t => t.id === teamId ? { ...t, activities: updatedActs } : t));
-    } catch (err) { console.error('Error adding activity:', err.message); }
+    } catch (err) { console.error(err.message); }
   };
 
   const editAct = async (teamId, actId, updatedData) => {
@@ -161,7 +160,7 @@ export function DashboardProvider({ children }) {
       const { error } = await supabase.from('teams').update({ activities: updatedActs }).eq('id', teamId);
       if (error) throw error;
       setTeams(prev => prev.map(t => t.id === teamId ? { ...t, activities: updatedActs } : t));
-    } catch (err) { console.error('Error editing activity:', err.message); }
+    } catch (err) { console.error(err.message); }
   };
 
   const deleteAct = async (teamId, actId) => {
@@ -174,7 +173,7 @@ export function DashboardProvider({ children }) {
       const { error } = await supabase.from('teams').update({ activities: updatedActs }).eq('id', teamId);
       if (error) throw error;
       setTeams(prev => prev.map(t => t.id === teamId ? { ...t, activities: updatedActs } : t));
-    } catch (err) { console.error('Error deleting activity:', err.message); }
+    } catch (err) { console.error(err.message); }
   };
 
   const updateDoc = async (teamId, actId, docType, docData) => {
@@ -197,7 +196,7 @@ export function DashboardProvider({ children }) {
       const { error } = await supabase.from('teams').update({ activities: updatedActs }).eq('id', teamId);
       if (error) throw error;
       setTeams(prev => prev.map(t => t.id === teamId ? { ...t, activities: updatedActs } : t));
-    } catch (err) { console.error('Error updating document:', err.message); }
+    } catch (err) { console.error(err.message); }
   };
 
   const allPICs = useMemo(() => {
