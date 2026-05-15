@@ -1,39 +1,35 @@
 /**
- * Sidebar.jsx — 4-Level Hierarchical Navigation (Final & Secure Version)
- *
- * Level 1  Team Category   accordion + mini progress bar
- * Level 2  Month           month list + sparkline trend
- * Level 3  Date            active dates + status dot (red=urgent / green=safe)
- * Level 4  PIC             list of person-in-charge names
+ * Sidebar.jsx — 4-Level Hierarchical Navigation (Production Secure Version)
  */
 
-import { useState, useMemo, useRef, useEffect } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
 import {
   BarChart3, Plus, MoreHorizontal, Pencil, Trash2,
   ChevronRight, Settings, X, Users, TrendingUp,
-  Calendar, AlertCircle,
 } from 'lucide-react'
 import { useDash } from '../contexts/DashboardContext.jsx'
 import { getIcon } from './ui/IconPicker.jsx'
 import { AddFolderModal, EditFolderModal, DeleteFolderDialog } from './modals/FolderModal.jsx'
 import Drop from './ui/Drop.jsx'
 import Tip from './ui/Tip.jsx'
-import { cn } from '../constants/helpers.js'
 import { useIsMobile } from '../hooks/useIsMobile.js'
 import { picHue, picInit } from '../constants/colors.js'
 
 // ─── MONTH HELPERS ────────────────────────────────────────────────
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des']
-const MONTH_FULL  = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
 
-/** Group activities by month → date → PIC (Secured against null/undefined) */
+/** Group activities by month → date → PIC (Super Secure Version) */
 function buildHierarchy(activities) {
   const safeActivities = Array.isArray(activities) ? activities : [];
   const months = new Map()
 
   safeActivities.forEach(a => {
-    if (!a?.date) return;
-    const [year, mo, day] = a.date.split('-')
+    if (!a || typeof a.date !== 'string') return;
+
+    const parts = a.date.split('-')
+    if (parts.length < 3) return;
+
+    const [year, mo, day] = parts
     const mKey = `${year}-${mo}`
     const mIdx = parseInt(mo, 10) - 1
 
@@ -58,8 +54,8 @@ function buildHierarchy(activities) {
 
 /** Determine date urgency: P0 or any Not Progress → urgent */
 function dateUrgency(dateNode) {
-  const acts = dateNode?.activities || []
-  if (acts.some(a => a.priority === 'P0' || a.status === 'Not Progress')) return 'urgent'
+  const acts = Array.isArray(dateNode?.activities) ? dateNode.activities : []
+  if (acts.some(a => a?.priority === 'P0' || a?.status === 'Not Progress')) return 'urgent'
   return 'safe'
 }
 
@@ -73,7 +69,7 @@ function Sparkline({ dates, w = 36, h = 14 }) {
     )
   }
 
-  const counts = dates.map(d => d?.activities?.length || 0)
+  const counts = dates.map(d => Array.isArray(d?.activities) ? d.activities.length : 0)
   const max = Math.max(...counts, 1)
   const step = w / (counts.length - 1)
 
@@ -101,9 +97,9 @@ function Sparkline({ dates, w = 36, h = 14 }) {
   )
 }
 
-/** Mini progress bar inside Level-1 team row (Secured against null) */
+/** Mini progress bar inside Level-1 team row */
 function TeamProgress({ activities }) {
-  const safeActivities = Array.isArray(activities) ? activities : [];
+  const safeActivities = Array.isArray(activities) ? activities : []
   const total  = safeActivities.length
   const done   = safeActivities.filter(a => a?.status === 'Done').length
   const pct    = total > 0 ? Math.round((done / total) * 100) : 0
@@ -173,7 +169,7 @@ function Accordion({ open, children }) {
 
 // ─── LEVEL 4 — PIC ROW ───────────────────────────────────────────
 function PICRow({ pic, isActive, onClick }) {
-  const name = pic ? pic.split('@')[0] : 'Unknown';
+  const name = pic ? pic.split('@')[0] : 'Unknown'
   return (
     <button
       onClick={onClick}
@@ -209,15 +205,13 @@ function DateRow({ dateNode, teamId, isTeamActive, currentSelDate, currentSelPIC
   const urgency   = dateNode?.urgency || 'safe'
   const isDateAct = isTeamActive && currentSelDate === dateNode?.date
 
-  // Collect unique PICs for this date safely
   const pics = useMemo(() => {
     const seen = new Set()
-    const acts = Array.isArray(dateNode?.activities) ? dateNode.activities : [];
-    return acts.filter(a => { if (seen.has(a.pic)) return false; seen.add(a.pic); return true }).map(a => a.pic)
+    const acts = Array.isArray(dateNode?.activities) ? dateNode.activities : []
+    return acts.filter(a => { if (!a?.pic || seen.has(a.pic)) return false; seen.add(a.pic); return true }).map(a => a.pic)
   }, [dateNode])
 
   const [picsOpen, setPicsOpen] = useState(false)
-
   const dayLabel = String(dateNode?.day || 0).padStart(2, '0')
   const count    = dateNode?.activities?.length || 0
 
@@ -283,11 +277,11 @@ function DateRow({ dateNode, teamId, isTeamActive, currentSelDate, currentSelPIC
 
 // ─── LEVEL 2 — MONTH ROW ─────────────────────────────────────────
 function MonthRow({ month, teamId, isTeamActive, currentSelDate, currentSelPIC, onSelectDate, onSelectPIC }) {
+  const safeDates = Array.isArray(month?.dates) ? month.dates : []
   const [open, setOpen] = useState(
-    currentSelDate && Array.isArray(month?.dates) ? month.dates.some(d => d.date === currentSelDate) : false
+    currentSelDate ? safeDates.some(d => d.date === currentSelDate) : false
   )
-  const safeDates = Array.isArray(month?.dates) ? month.dates : [];
-  const totalActs = safeDates.reduce((s, d) => s + (d?.activities?.length || 0), 0)
+  const totalActs = safeDates.reduce((s, d) => s + (Array.isArray(d?.activities) ? d.activities.length : 0), 0)
   const label     = MONTH_NAMES[month?.monthIdx] || 'Unknown'
 
   return (
@@ -320,3 +314,296 @@ function MonthRow({ month, teamId, isTeamActive, currentSelDate, currentSelPIC, 
           background: 'rgba(255,255,255,.06)', color: 'rgb(100,116,139)', marginLeft: '2px',
         }}>
           {totalActs}
+        </span>
+      </button>
+
+      <Accordion open={open}>
+        <div style={{ marginLeft: '10px', paddingLeft: '8px', borderLeft: '1px solid #1e2d4a', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+          {safeDates.map(dn => (
+            <DateRow
+              key={dn?.date}
+              dateNode={{ ...dn, urgency: dateUrgency(dn) }}
+              teamId={teamId}
+              isTeamActive={isTeamActive}
+              currentSelDate={currentSelDate}
+              currentSelPIC={currentSelPIC}
+              onSelectDate={onSelectDate}
+              onSelectPIC={onSelectPIC}
+            />
+          ))}
+        </div>
+      </Accordion>
+    </div>
+  )
+}
+
+// ─── LEVEL 1 — TEAM ROW ──────────────────────────────────────────
+function TeamRow({ team, isActive, selDate, selPIC, onSelectTeam, onSelectDate, onSelectPIC, onEdit, onDelete }) {
+  const [open, setOpen] = useState(isActive)
+  const months  = useMemo(() => buildHierarchy(team?.activities), [team?.activities])
+  const hasData = months.length > 0
+
+  useEffect(() => { if (isActive) setOpen(true) }, [isActive])
+
+  const handleTeamClick = () => {
+    onSelectTeam(team?.id)
+    setOpen(v => !v)
+  }
+
+  const actLength = Array.isArray(team?.activities) ? team.activities.length : 0
+
+  return (
+    <div style={{ marginBottom: '2px' }}>
+      <div
+        style={{
+          display: 'flex', alignItems: 'center', gap: '6px',
+          padding: '6px 6px 6px 8px', borderRadius: '10px',
+          border: isActive && !selDate ? '1px solid rgba(59,130,246,.25)' : '1px solid transparent',
+          background: isActive && !selDate ? 'rgba(37,99,235,.12)' : 'transparent',
+          transition: 'background .15s, border-color .15s',
+        }}
+      >
+        {hasData ? (
+          <button
+            onClick={() => setOpen(v => !v)}
+            style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '1px', display: 'flex', alignItems: 'center', flexShrink: 0 }}
+          >
+            <ChevronRight
+              size={12}
+              style={{
+                color: isActive ? 'rgb(96,165,250)' : 'rgb(71,85,105)',
+                transform: open ? 'rotate(90deg)' : 'none',
+                transition: 'transform .22s ease',
+              }}
+            />
+          </button>
+        ) : (
+          <span style={{ width: '14px', flexShrink: 0 }} />
+        )}
+
+        <button
+          onClick={handleTeamClick}
+          style={{
+            flex: 1, display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0,
+            border: 'none', background: 'transparent', cursor: 'pointer', padding: 0,
+          }}
+        >
+          {/* FIX UTAMA: Menggunakan React.createElement untuk membungkus getIcon secara aman */}
+          {React.createElement(getIcon(team?.iconName), {
+            size: 14,
+            style: { color: isActive ? 'rgb(147,197,253)' : 'rgb(100,116,139)', flexShrink: 0 }
+          })}
+
+          <span style={{
+            fontSize: '12px', fontWeight: isActive ? 700 : 500,
+            color: isActive ? 'rgb(226,232,240)' : 'rgb(148,163,184)',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'left',
+            transition: 'color .15s',
+          }}>
+            {team?.name || 'Unnamed Team'}
+          </span>
+        </button>
+
+        {actLength > 0 && (
+          <TeamProgress activities={team.activities} />
+        )}
+
+        <Drop
+          trigger={
+            <button
+              style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '2px', display: 'inline-flex', color: 'rgb(55,65,81)', borderRadius: '4px' }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'rgb(148,163,184)'; e.currentTarget.style.background = 'rgba(255,255,255,.06)' }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'rgb(55,65,81)'; e.currentTarget.style.background = 'transparent' }}
+            >
+              <MoreHorizontal size={12} />
+            </button>
+          }
+          items={[
+            { label: 'Edit Folder', icon: <Pencil size={13} />, onClick: onEdit },
+            'sep',
+            { label: 'Hapus', icon: <Trash2 size={13} />, danger: true, onClick: onDelete },
+          ]}
+        />
+      </div>
+
+      <Accordion open={open && hasData}>
+        <div style={{ marginLeft: '12px', paddingLeft: '8px', borderLeft: '1px solid #1a2d4a', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+          {months.map(m => (
+            <MonthRow
+              key={m.key}
+              month={m}
+              teamId={team?.id}
+              isTeamActive={isActive}
+              currentSelDate={selDate}
+              currentSelPIC={selPIC}
+              onSelectDate={(d) => onSelectDate(team?.id, d)}
+              onSelectPIC={onSelectPIC}
+            />
+          ))}
+          {months.length === 0 && (
+            <p style={{ fontSize: '11px', color: 'rgb(55,65,81)', fontStyle: 'italic', padding: '4px 6px', margin: 0 }}>
+              Belum ada aktivitas
+            </p>
+          )}
+        </div>
+      </Accordion>
+    </div>
+  )
+}
+
+// ─── LEGEND ───────────────────────────────────────────────────────
+function Legend() {
+  return (
+    <div style={{ padding: '6px 10px 8px', display: 'flex', alignItems: 'center', gap: '10px', borderTop: '1px solid #0f1629' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 4px #ef444488', display: 'inline-block' }} />
+        <span style={{ fontSize: '9px', color: 'rgb(71,85,105)' }}>Urgent</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 4px #10b98188', display: 'inline-block' }} />
+        <span style={{ fontSize: '9px', color: 'rgb(71,85,105)' }}>Aman</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'auto' }}>
+        <TrendingUp size={9} style={{ color: 'rgb(59,130,246)' }} />
+        <span style={{ fontSize: '9px', color: 'rgb(71,85,105)' }}>Tren</span>
+      </div>
+    </div>
+  )
+}
+
+// ─── SIDEBAR ROOT ─────────────────────────────────────────────────
+export default function Sidebar({ isOpen, onClose }) {
+  const {
+    teams, activeTeam, selDate, selPIC,
+    selectTeam, selectDate, setSelPIC,
+    addTeam, editTeam, deleteTeam,
+  } = useDash()
+
+  const isMobile = useIsMobile()
+
+  const [folderModal, setFolderModal] = useState({ open: false, team: null })
+  const [delState,    setDelState]    = useState({ open: false, team: null })
+
+  const handleSelectTeam = (id) => selectTeam(id)
+  const handleSelectDate = (teamId, date) => {
+    if (activeTeam !== teamId) selectTeam(teamId)
+    selectDate(date)
+  }
+  const handleSelectPIC = (pic) => setSelPIC(pic)
+
+  const safeTeams = Array.isArray(teams) ? teams : []
+
+  const inner = (
+    <div className="sidebar-bg" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+
+      {/* ── Logo ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 12px 12px', borderBottom: '1px solid #0f1629' }}>
+        <div style={{
+          width: '30px', height: '30px', borderRadius: '9px',
+          background: 'linear-gradient(135deg,#3b82f6,#6366f1)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 4px 12px rgba(59,130,246,.35)', flexShrink: 0,
+        }}>
+          <BarChart3 size={15} style={{ color: 'white' }} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontSize: '13px', fontWeight: 800, color: 'rgb(241,245,249)', margin: 0, lineHeight: 1.2 }}>Working Tracker</p>
+          <p style={{ fontSize: '10px', color: 'rgb(71,85,105)', margin: 0 }}>IA &amp; RM</p>
+        </div>
+        {isMobile && (
+          <button onClick={onClose} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'rgb(71,85,105)', padding: '4px', display: 'flex', borderRadius: '6px' }}>
+            <X size={15} />
+          </button>
+        )}
+      </div>
+
+      {/* ── Section header ── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px 4px' }}>
+        <span style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '.12em', color: 'rgb(71,85,105)' }}>
+          Team Folders
+        </span>
+        <Tip label="Tambah folder">
+          <button
+            onClick={() => setFolderModal({ open: true, team: null })}
+            style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'rgb(71,85,105)', padding: '3px', display: 'flex', borderRadius: '5px', transition: 'color .15s' }}
+            onMouseEnter={e => e.currentTarget.style.color = 'rgb(148,163,184)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'rgb(71,85,105)'}
+          >
+            <Plus size={13} />
+          </button>
+        </Tip>
+      </div>
+
+      {/* ── Level 1 Teams ── */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '4px 6px 8px' }}>
+        {safeTeams.map(team => (
+          <TeamRow
+            key={team?.id}
+            team={team}
+            isActive={team?.id === activeTeam}
+            selDate={team?.id === activeTeam ? selDate : null}
+            selPIC={team?.id === activeTeam ? selPIC : null}
+            onSelectTeam={handleSelectTeam}
+            onSelectDate={handleSelectDate}
+            onSelectPIC={handleSelectPIC}
+            onEdit={() => setFolderModal({ open: true, team })}
+            onDelete={() => setDelState({ open: true, team })}
+          />
+        ))}
+      </div>
+
+      {/* ── Legend ── */}
+      <Legend />
+
+      {/* ── Footer ── */}
+      <div style={{ padding: '4px 6px 8px', borderTop: '1px solid #0f1629' }}>
+        <button
+          className="sb-footer-btn"
+          style={{ width: '100%', justifyContent: 'flex-start', textAlign: 'left', background: 'transparent', border: 'none', cursor: 'pointer' }}
+        >
+          <Settings size={14} style={{ flexShrink: 0 }} />
+          <span>Manage Access (Admin)</span>
+        </button>
+      </div>
+
+      {/* ── Modals ── */}
+      <AddFolderModal
+        open={folderModal.open && !folderModal.team}
+        onClose={() => setFolderModal({ open: false, team: null })}
+        onAdd={addTeam}
+      />
+      <EditFolderModal
+        open={folderModal.open && !!folderModal.team}
+        onClose={() => setFolderModal({ open: false, team: null })}
+        team={folderModal.team}
+        onEdit={editTeam}
+      />
+      <DeleteFolderDialog
+        open={delState.open}
+        onClose={() => setDelState({ open: false, team: null })}
+        team={delState.team}
+        onDelete={deleteTeam}
+      />
+    </div>
+  )
+
+  if (isMobile) {
+    return isOpen ? (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 40, display: 'flex' }}>
+        <div
+          style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)' }}
+          onClick={onClose}
+        />
+        <div style={{ position: 'relative', width: '17rem', height: '100%', zIndex: 10, boxShadow: '0 25px 50px rgba(0,0,0,.6)' }}>
+          {inner}
+        </div>
+      </div>
+    ) : null
+  }
+
+  return (
+    <div style={{ width: '16rem', flexShrink: 0, height: '100vh', position: 'sticky', top: 0, display: 'flex', flexDirection: 'column' }}>
+      {inner}
+    </div>
+  )
+}
