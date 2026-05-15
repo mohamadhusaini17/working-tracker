@@ -20,14 +20,23 @@ function StatCard({ icon: Icon, label, value, sub, valueClass, iconClass, editMo
   )
 }
 
-export default function StatCards({ stats, selPIC, selDate, editMode }) {
-  const pct = stats.total > 0 ? Math.round(stats.done / stats.total * 100) : 0
+// Ganti baris ini di src/components/StatCards.jsx Anda:
+export default function StatCards({ stats = { total: 0, done: 0, inProg: 0, p0: 0 }, selPIC, selDate, editMode }) {
+  // Tambahkan juga optional chaining (?.) untuk proteksi ganda
+  const safeStats = {
+    total: stats?.total || 0,
+    done: stats?.done || 0,
+    inProg: stats?.inProg || 0,
+    p0: stats?.p0 || 0
+  }
+
+  const pct = safeStats.total > 0 ? Math.round(safeStats.done / safeStats.total * 100) : 0
 
   const cards = [
     {
       icon:       Activity,
       label:      'Total',
-      value:      stats.total,
+      value:      safeStats.total,
       sub:        selPIC ? 'aktivitas PIC' : selDate ? 'hari ini' : 'semua waktu',
       valueClass: 'text-slate-100',
       iconClass:  'ic-slate',
@@ -35,7 +44,7 @@ export default function StatCards({ stats, selPIC, selDate, editMode }) {
     {
       icon:       CheckCircle2,
       label:      'Selesai',
-      value:      stats.done,
+      value:      safeStats.done,
       sub:        `${pct}% rate`,
       valueClass: 'text-emerald-400',
       iconClass:  'ic-em',
@@ -43,7 +52,7 @@ export default function StatCards({ stats, selPIC, selDate, editMode }) {
     {
       icon:       Clock,
       label:      'Dalam Proses',
-      value:      stats.inProg,
+      value:      safeStats.inProg,
       sub:        'Tugas aktif',
       valueClass: 'text-blue-400',
       iconClass:  'ic-bl',
@@ -51,10 +60,10 @@ export default function StatCards({ stats, selPIC, selDate, editMode }) {
     {
       icon:       AlertCircle,
       label:      'Prioritas P0',
-      value:      stats.p0,
+      value:      safeStats.p0,
       sub:        'Kritis',
-      valueClass: stats.p0 > 0 ? 'text-red-400' : 'text-slate-700',
-      iconClass:  stats.p0 > 0 ? 'ic-rd' : 'ic-dim',
+      valueClass: safeStats.p0 > 0 ? 'text-red-400' : 'text-slate-700',
+      iconClass:  safeStats.p0 > 0 ? 'ic-rd' : 'ic-dim',
     },
   ]
 

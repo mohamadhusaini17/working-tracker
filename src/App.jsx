@@ -14,10 +14,24 @@ function DashboardContent({ onMenu }) {
   const {
     activeTeam, selDate, selPIC,
     setSelPIC, selectDate,
-    getTeam, getActsByDate, getPICs, getStats
+    getTeam, getActsByDate, getPICs, getStats,
+    loading // <-- 1. Ambil state loading dari Context Anda
   } = useDash()
 
   const [editMode, setEditMode] = useState(false)
+
+  // --- 2. PASANG LOADING GATE DI SINI (MENAHAN CRASH) ---
+  if (loading) {
+    return (
+      <div className="flex flex-1 flex-col h-screen w-full items-center justify-center bg-[#0f172a] text-slate-200">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
+          <p className="text-sm font-medium text-slate-400">Menghubungkan ke Supabase...</p>
+        </div>
+      </div>
+    )
+  }
+
   const team = getTeam()
   
   // Mengambil stats real-time berdasarkan filter yang aktif
@@ -28,7 +42,7 @@ function DashboardContent({ onMenu }) {
     if (selDate && selPIC) {
       return getActsByDate(activeTeam, selDate).filter(a => a.pic === selPIC)
     }
-    return !selDate ? team.activities : getActsByDate(activeTeam, selDate)
+    return !selDate ? (team.activities || []) : getActsByDate(activeTeam, selDate)
   }, [team, selDate, selPIC, activeTeam, getActsByDate])
 
   const pics = (selDate && !selPIC) ? getPICs(activeTeam, selDate) : []
@@ -62,41 +76,31 @@ function DashboardContent({ onMenu }) {
           </nav>
         </div>
 
-        {/* 1. Stat Cards (Menampilkan 4 Card Utama) */}
+        {/* 1. Stat Cards */}
         <StatCards stats={stats} selPIC={selPIC} selDate={selDate} editMode={editMode} />
 
-        {/* 2. Charts Section (Dua Kolom: Bar & Donut) */}
+        {/* 2. Charts Section */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          
-          {/* Performance Analytics - Perbandingan Antar Tim */}
           <Card className="xl:col-span-2 p-6 bg-[#1e293b]/50 border-slate-800 shadow-xl backdrop-blur-sm">
              <div className="flex items-center gap-2 mb-6">
                 <BarChart3 size={18} className="text-blue-400" />
                 <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300">Performance Analytics</h3>
              </div>
-             <DashboardCharts 
-                stats={stats} 
-                viewType="bar" 
-              />
+             <DashboardCharts stats={stats} viewType="bar" />
           </Card>
 
-          {/* Activity Composition - Detail Status Tim Aktif */}
           <Card className="p-6 bg-[#1e293b]/50 border-slate-800 shadow-xl backdrop-blur-sm">
             <div className="flex items-center gap-2 mb-6">
                 <PieIcon size={18} className="text-teal-400" />
                 <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300">Activity Composition</h3>
              </div>
-            <DashboardCharts 
-              stats={stats} 
-              viewType="pie"
-            />
+            <DashboardCharts stats={stats} viewType="pie" />
           </Card>
         </div>
 
         {/* 3. Bottom Detail Section */}
         <div className="grid grid-cols-1 gap-6">
           {selPIC ? (
-            /* Tampilan Detail Log jika PIC dipilih */
             <Card className="p-6 border-slate-800 bg-[#1e293b]/30">
               <div className="flex items-center gap-2 mb-6">
                 <Activity size={18} className="text-purple-400" />
@@ -105,7 +109,6 @@ function DashboardContent({ onMenu }) {
               <ActivityTable activities={tableActs} teamId={activeTeam} />
             </Card>
           ) : selDate ? (
-            /* Tampilan Personnel Breakdown jika Tanggal dipilih */
             <div className="flex flex-col gap-4">
                <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-2 px-1">
                 <Users size={14} /> Team Personnel Breakdown
@@ -117,7 +120,6 @@ function DashboardContent({ onMenu }) {
               </div>
             </div>
           ) : (
-            /* Tampilan Umum (Summary) */
             <Card className="p-6 border-slate-800 bg-[#1e293b]/30">
               <h2 className="text-sm font-bold uppercase tracking-wider mb-6">Team Activity Overview</h2>
               <ActivityTable activities={tableActs} teamId={activeTeam} />
