@@ -41,12 +41,65 @@ export function DashboardProvider({ children }) {
     fetchTeams();
   }, []);
 
+  // ─── FUNGSI SELEKTOR & GETTER UTAMA YANG DICARI APP.JSX ───
+
   const selectDate = (d) => { setSelDate(d); setSelPIC(null); };
   const selectTeam = (id) => { setActiveTeam(id); setSelDate(null); setSelPIC(null); };
 
-  // ─── FUNGSI AKSI MUTASI DATA (PENGAMAN AMAN AGAR TIDAK UNDEFINED) ───
-  
-  // 1. Tambah Aktivitas
+  // 1. Ambil data tim aktif saat ini
+  const getTeam = () => {
+    return teams.find(t => t.id === activeTeam) || null;
+  };
+
+  // 2. Ambil aktivitas berdasarkan tanggal spesifik
+  const getActsByDate = (teamId, date) => {
+    const target = teams.find(t => t.id === teamId);
+    if (!target || !Array.isArray(target.activities)) return [];
+    return target.activities.filter(a => a && a.date === date);
+  };
+
+  // 3. Ambil rangkuman performa PIC pada tanggal spesifik
+  const getPICs = (teamId, date) => {
+    const acts = getActsByDate(teamId, date);
+    const summary = {};
+    
+    acts.forEach(a => {
+      if (!a || !a.pic) return;
+      if (!summary[a.pic]) {
+        summary[a.pic] = { pic: a.pic, total: 0, done: 0, progressSum: 0 };
+      }
+      summary[a.pic].total += 1;
+      if (a.status === 'Done') summary[a.pic].done += 1;
+      summary[a.pic].progressSum += (Number(a.progress) || 0);
+    });
+
+    return Object.values(summary).map(p => ({
+      pic: p.pic,
+      tasks: p.total,
+      done: p.done,
+      avgProgress: Math.round(p.progressSum / p.total)
+    }));
+  };
+
+  // 4. Kalkulator Rangkuman Statistik untuk Komponen Card & Chart
+  const getStats = (teamId, date, pic) => {
+    const target = teams.find(t => t.id === teamId);
+    let acts = target && Array.isArray(target.activities) ? target.activities : [];
+
+    if (date) acts = acts.filter(a => a && a.date === date);
+    if (pic) acts = acts.filter(a => a && a.pic === pic);
+
+    const total = acts.length;
+    const done = acts.filter(a => a?.status === 'Done').length;
+    const onProg = acts.filter(a => a?.status === 'In Progress' || a?.status === 'On Progress').length;
+    const p1 = acts.filter(a => a?.priority === 'P1').length;
+    const p2 = acts.filter(a => a?.priority === 'P2').length;
+    const p3 = acts.filter(a => a?.priority === 'P3').length;
+
+    return { total, done, onProg, p1, p2, p3 };
+  };
+
+  // ─── FUNGSI AKSI MUTASI DATA (PENGAMAN AMAN) ───
   const addAct = async (teamId, newAct) => {
     try {
       const targetTeam = teams.find(t => t.id === teamId);
@@ -54,19 +107,12 @@ export function DashboardProvider({ children }) {
       const currentActs = Array.isArray(targetTeam.activities) ? targetTeam.activities : [];
       const updatedActs = [...currentActs, { id: `act-${Date.now()}`, ...newAct }];
 
-      const { error } = await supabase
-        .from('teams')
-        .update({ activities: updatedActs })
-        .eq('id', teamId);
-
+      const { error } = await supabase.from('teams').update({ activities: updatedActs }).eq('id', teamId);
       if (error) throw error;
       setTeams(prev => prev.map(t => t.id === teamId ? { ...t, activities: updatedActs } : t));
-    } catch (err) {
-      console.error('Error adding activity:', err.message);
-    }
+    } catch (err) { console.error(err.message); }
   };
 
-  // 2. Edit Aktivitas
   const editAct = async (teamId, actId, updatedData) => {
     try {
       const targetTeam = teams.find(t => t.id === teamId);
@@ -74,19 +120,12 @@ export function DashboardProvider({ children }) {
       const currentActs = Array.isArray(targetTeam.activities) ? targetTeam.activities : [];
       const updatedActs = currentActs.map(a => a.id === actId ? { ...a, ...updatedData } : a);
 
-      const { error } = await supabase
-        .from('teams')
-        .update({ activities: updatedActs })
-        .eq('id', teamId);
-
+      const { error } = await supabase.from('teams').update({ activities: updatedActs }).eq('id', teamId);
       if (error) throw error;
       setTeams(prev => prev.map(t => t.id === teamId ? { ...t, activities: updatedActs } : t));
-    } catch (err) {
-      console.error('Error editing activity:', err.message);
-    }
+    } catch (err) { console.error(err.message); }
   };
 
-  // 3. Hapus Aktivitas
   const deleteAct = async (teamId, actId) => {
     try {
       const targetTeam = teams.find(t => t.id === teamId);
@@ -94,19 +133,12 @@ export function DashboardProvider({ children }) {
       const currentActs = Array.isArray(targetTeam.activities) ? targetTeam.activities : [];
       const updatedActs = currentActs.filter(a => a.id !== actId);
 
-      const { error } = await supabase
-        .from('teams')
-        .update({ activities: updatedActs })
-        .eq('id', teamId);
-
+      const { error } = await supabase.from('teams').update({ activities: updatedActs }).eq('id', teamId);
       if (error) throw error;
       setTeams(prev => prev.map(t => t.id === teamId ? { ...t, activities: updatedActs } : t));
-    } catch (err) {
-      console.error('Error deleting activity:', err.message);
-    }
+    } catch (err) { console.error(err.message); }
   };
 
-  // 4. Update Dokumen Aktivitas (Fungsi Vital Penyebab Utama o is not a function)
   const updateDoc = async (teamId, actId, docType, docData) => {
     try {
       const targetTeam = teams.find(t => t.id === teamId);
@@ -118,36 +150,25 @@ export function DashboardProvider({ children }) {
           const currentDocs = a.documents || {};
           return {
             ...a,
-            documents: {
-              ...currentDocs,
-              [docType]: { uploaded: true, name: docData.name, url: docData.url || '' }
-            }
+            documents: { ...currentDocs, [docType]: { uploaded: true, name: docData.name, url: docData.url || '' } }
           };
         }
         return a;
       });
 
-      const { error } = await supabase
-        .from('teams')
-        .update({ activities: updatedActs })
-        .eq('id', teamId);
-
+      const { error } = await supabase.from('teams').update({ activities: updatedActs }).eq('id', teamId);
       if (error) throw error;
       setTeams(prev => prev.map(t => t.id === teamId ? { ...t, activities: updatedActs } : t));
-    } catch (err) {
-      console.error('Error updating document:', err.message);
-    }
+    } catch (err) { console.error(err.message); }
   };
 
-  // --- LOGIKA PIC DENGAN PENGAMAN DOUBLE VALIDASI ---
+  // --- LOGIKA PIC LIST ---
   const allPICs = useMemo(() => {
     const s = new Set();
     if (Array.isArray(teams)) {
       teams.forEach(t => {
         if (t && Array.isArray(t.activities)) {
-          t.activities.forEach(a => {
-            if (a && a.pic) s.add(a.pic);
-          });
+          t.activities.forEach(a => { if (a && a.pic) s.add(a.pic); });
         }
       });
     }
@@ -155,22 +176,11 @@ export function DashboardProvider({ children }) {
   }, [teams]);
 
   const value = {
-    teams,
-    setTeams,
-    activeTeam,
-    setActiveTeam,
-    selDate,
-    setSelDate,
-    selPIC,
-    setSelPIC,
-    selectDate,
-    selectTeam,
-    allPICs,
-    loading,
-    addAct,      // Diekspor dengan aman
-    editAct,     // Diekspor dengan aman
-    deleteAct,   // Diekspor dengan aman
-    updateDoc    // Diekspor dengan aman
+    teams, setTeams, activeTeam, setActiveTeam,
+    selDate, setSelDate, selPIC, setSelPIC,
+    selectDate, selectTeam, allPICs, loading,
+    getTeam, getActsByDate, getPICs, getStats, // SINKRONISASI COCOK 100% DENGAN APP.JSX
+    addAct, editAct, deleteAct, updateDoc
   };
 
   return (
