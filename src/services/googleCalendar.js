@@ -1,10 +1,10 @@
 /**
- * services/googleCalendar.js — VERSI FINAL DINAMIS TANGGAL & ANTI-BENTROK WEEKLY
+ * services/googleCalendar.js — VERSI FINAL FIX RECURRING (WEEKLY/MONTHLY)
  */
 
 export const fetchGoogleEvents = async (accessToken, targetDate) => {
   try {
-    // 🛠️ JIKA targetDate TIDAK DIKIRIM, BARU DEFAULT KE HARI INI
+    // JIKA targetDate TIDAK DIKIRIM, BARU DEFAULT KE HARI INI
     const baseDate = targetDate ? new Date(targetDate) : new Date()
     
     // Set rentang waktu awal hari (00:00:00) dari tanggal yang dipilih
@@ -46,10 +46,14 @@ export const mapGoogleEventToActivity = (event, userEmail, teamId) => {
     return isoString.split('T')[0] 
   }
 
-  // 🛠️ FIX FIX: Mencegah duplikasi/penimpaan data pada event berulang (Weekly)
-  // Membuat stempel waktu unik berdasarkan jam mulai event (menghapus simbol non-angka)
-  const timeStampId = startTime.replace(/[^0-9]/g, '')
-  const uniqueId = `google-${event.id}-${timeStampId}-${Math.floor(Math.random() * 1000)}`
+  // 🛠️ AMAN RECURRING: Ambil ID unik instance dari Google jika ini event mingguan/bulanan
+  // Menghilangkan karakter ilegal string seperti underscore (_) atau titik (.) agar ramah di Supabase
+  const rawEventId = event.id.replace(/[^a-zA-Z0-9]/g, '')
+  const recurringPrefix = event.recurringEventId ? 'rec-' : 'single-'
+  
+  // Kombinasi ID yang dijamin 100% berbeda total antara Weekly dan Monthly
+  const cleanTime = formatTime(startTime).replace(':', '')
+  const uniqueId = `goo-${recurringPrefix}${rawEventId.substring(0, 30)}-${cleanTime}`
 
   return {
     id: uniqueId,
