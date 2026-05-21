@@ -1,5 +1,5 @@
 /**
- * services/googleCalendar.js — VERSI FINAL DINAMIS TANGGAL
+ * services/googleCalendar.js — VERSI FINAL DINAMIS TANGGAL & ANTI-BENTROK WEEKLY
  */
 
 export const fetchGoogleEvents = async (accessToken, targetDate) => {
@@ -46,8 +46,13 @@ export const mapGoogleEventToActivity = (event, userEmail, teamId) => {
     return isoString.split('T')[0] 
   }
 
+  // 🛠️ FIX FIX: Mencegah duplikasi/penimpaan data pada event berulang (Weekly)
+  // Membuat stempel waktu unik berdasarkan jam mulai event (menghapus simbol non-angka)
+  const timeStampId = startTime.replace(/[^0-9]/g, '')
+  const uniqueId = `google-${event.id}-${timeStampId}-${Math.floor(Math.random() * 1000)}`
+
   return {
-    id: `google-${event.id}-${Date.now()}-${Math.random()}`,
+    id: uniqueId,
     team_id: teamId,
     pic: userEmail || 'system.google', 
     status: 'In Progress',
