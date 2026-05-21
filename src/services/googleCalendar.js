@@ -1,15 +1,13 @@
 /**
- * services/googleCalendar.js — VERSI FINAL FIX RECURRING (WEEKLY/MONTHLY)
+ * services/googleCalendar.js — VERSI FINAL FILTER WAKTU (09:00 - 18:00) & ANTI-DUPLIKASI
  */
 
 export const fetchGoogleEvents = async (accessToken, targetDate) => {
   try {
-    // JIKA targetDate TIDAK DIKIRIM, BARU DEFAULT KE HARI INI
     const baseDate = targetDate ? new Date(targetDate) : new Date()
     
-    // Set rentang waktu awal hari (00:00:00) dari tanggal yang dipilih
+    // Set rentang waktu awal hari (00:00:00) dan akhir hari (23:59:59)
     const startOfDay = new Date(baseDate.setHours(0, 0, 0, 0)).toISOString()
-    // Set rentang waktu akhir hari (23:59:59) dari tanggal yang dipilih
     const endOfDay = new Date(baseDate.setHours(23, 59, 59, 999)).toISOString()
 
     const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${startOfDay}&timeMax=${endOfDay}&singleEvents=true&orderBy=startTime`
@@ -46,22 +44,25 @@ export const mapGoogleEventToActivity = (event, userEmail, teamId) => {
     return isoString.split('T')[0] 
   }
 
-  // 🛠️ AMAN RECURRING: Ambil ID unik instance dari Google jika ini event mingguan/bulanan
-  // Menghilangkan karakter ilegal string seperti underscore (_) atau titik (.) agar ramah di Supabase
-  const rawEventId = event.id.replace(/[^a-zA-Z0-9]/g, '')
-  const recurringPrefix = event.recurringEventId ? 'rec-' : 'single-'
-  
-  // Kombinasi ID yang dijamin 100% berbeda total antara Weekly dan Monthly
-  const cleanTime = formatTime(startTime).replace(':', '')
-  const uniqueId = `goo-${recurringPrefix}${rawEventId.substring(0, 30)}-${cleanTime}`
+  const jamMulaiStr = formatTime(startTime) // Format: "HH:MM"
+  const jamSelesaiStr = formatTime(endTime) // Format: "HH:MM"
+
+  // 🛠️ TRIGGER FILTER WAKTU: Abaikan meeting di luar jam 09:00 - 18:00
+  if (jamMulaiStr < '09:00' || jamSelesaiStr > '18:00') {
+    return null // Mengembalikan null agar bisa disaring keluar di backend/loop frontend
+  }
+
+  // Membuat ID acak murni yang ramah bagi Supabase untuk menghindari konflik balapan data (race condition)
+  const randomSuffix = Math.random().toString(36).substring(2, 7)
+  const uniqueId = `goo-${jamMulaiStr.replace(':', '')}-${randomSuffix}`
 
   return {
     id: uniqueId,
     team_id: teamId,
     pic: userEmail || 'system.google', 
     status: 'In Progress',
-    jamMulai: formatTime(startTime),
-    jamSelesai: formatTime(endTime),
+    jamMulai: jamMulaiStr,
+    jamSelesai: jamSelesaiStr,
     kegiatan: event.summary || 'Meeting Tanpa Judul',
     priority: 'P2', 
     progress: 0,
