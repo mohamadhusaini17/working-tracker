@@ -1,5 +1,5 @@
 /**
- * services/googleCalendar.js — VERSI TOTAL FIX (RECURRING EXCEPTION BYPASS)
+ * services/googleCalendar.js — VERSI SOLUSI MUTLAK DATABASE UPSERT
  */
 
 export const fetchGoogleEvents = async (accessToken, targetDate) => {
@@ -9,7 +9,6 @@ export const fetchGoogleEvents = async (accessToken, targetDate) => {
     const startOfDay = new Date(baseDate.setHours(0, 0, 0, 0)).toISOString()
     const endOfDay = new Date(baseDate.setHours(23, 59, 59, 999)).toISOString()
 
-    // Tetap gunakan singleEvents=true untuk memecah rentang tanggal secara murni
     const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${startOfDay}&timeMax=${endOfDay}&singleEvents=true&orderBy=startTime`
 
     const response = await fetch(url, {
@@ -29,14 +28,13 @@ export const fetchGoogleEvents = async (accessToken, targetDate) => {
 }
 
 export const mapGoogleEventToActivity = (event, userEmail, teamId) => {
-  // Ambil waktu murni dari instance event yang terjadi di tanggal tersebut
   const startTime = event.start?.dateTime || event.start?.date || ''
   const endTime = event.end?.dateTime || event.end?.date || ''
 
-  if (!startTime) return null; // Abaikan jika benar-benar tidak ada data waktu
+  if (!startTime) return null
 
   const formatTime = (isoString) => {
-    if (!isoString.includes('T')) return '09:00' // Default fallback aman
+    if (!isoString.includes('T')) return '09:00' 
     return isoString.substring(11, 16) 
   }
 
@@ -46,20 +44,20 @@ export const mapGoogleEventToActivity = (event, userEmail, teamId) => {
 
   const jamMulaiStr = formatTime(startTime) 
   const jamSelesaiStr = formatTime(endTime) 
+  const eventDate = formatDate(startTime)
 
-  // Filter jam kerja (09:00 - 18:00)
+  // LOGIKA FILTER JAM KERJA (09:00 - 18:00)
   if (jamMulaiStr < '09:00' || jamMulaiStr > '18:00') {
     return null 
   }
 
-  // FORCE ID UNIK: Gunakan ID gabungan antara ID Event dan Tanggal 
-  // Ini memastikan Exception Event dari recurring meeting tidak tabrakan di Supabase
-  const eventDate = formatDate(startTime)
-  const cleanId = (event.id || '').replace(/[^a-zA-Z0-9]/g, '')
-  const uniqueId = `goo-${cleanId.substring(0, 30)}-${eventDate}`
+  // 🛠️ FIX UTAMA SUPABASE: Buat ID Unik Absolut Gabungan Google ID + Tanggal Event
+  // Menghilangkan semua karakter aneh agar aman dibaca sebagai primary key string di Supabase
+  const cleanGoogleId = (event.id || '').replace(/[^a-zA-Z0-9]/g, '')
+  const uniqueId = `google-${cleanGoogleId.substring(0, 30)}-${eventDate}`
 
   return {
-    id: uniqueId,
+    id: uniqueId, // ID ini dijamin unik per hari, mencegah isu skip upsert di Supabase
     team_id: teamId,
     pic: userEmail || 'system.google', 
     status: 'In Progress',
