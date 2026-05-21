@@ -1,15 +1,15 @@
 /**
- * services/googleCalendar.js — VERSI FINAL FILTER WAKTU (09:00 - 18:00) & ANTI-DUPLIKASI
+ * services/googleCalendar.js — VERSI TOTAL FIX (RECURRING EXCEPTION BYPASS)
  */
 
 export const fetchGoogleEvents = async (accessToken, targetDate) => {
   try {
     const baseDate = targetDate ? new Date(targetDate) : new Date()
     
-    // Set rentang waktu awal hari (00:00:00) dan akhir hari (23:59:59)
     const startOfDay = new Date(baseDate.setHours(0, 0, 0, 0)).toISOString()
     const endOfDay = new Date(baseDate.setHours(23, 59, 59, 999)).toISOString()
 
+    // Tetap gunakan singleEvents=true untuk memecah rentang tanggal secara murni
     const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${startOfDay}&timeMax=${endOfDay}&singleEvents=true&orderBy=startTime`
 
     const response = await fetch(url, {
@@ -29,32 +29,34 @@ export const fetchGoogleEvents = async (accessToken, targetDate) => {
 }
 
 export const mapGoogleEventToActivity = (event, userEmail, teamId) => {
+  // Ambil waktu murni dari instance event yang terjadi di tanggal tersebut
   const startTime = event.start?.dateTime || event.start?.date || ''
   const endTime = event.end?.dateTime || event.end?.date || ''
 
-  // Memperbaiki format pembacaan jam (antisipasi format all-day event tanpa format waktu)
+  if (!startTime) return null; // Abaikan jika benar-benar tidak ada data waktu
+
   const formatTime = (isoString) => {
-    if (!isoString || !isoString.includes('T')) return '08:00'
+    if (!isoString.includes('T')) return '09:00' // Default fallback aman
     return isoString.substring(11, 16) 
   }
 
-  // Memastikan ekstraksi tanggal murni (YYYY-MM-DD)
   const formatDate = (isoString) => {
-    if (!isoString) return new Date().toISOString().split('T')[0]
     return isoString.split('T')[0] 
   }
 
-  const jamMulaiStr = formatTime(startTime) // Format: "HH:MM"
-  const jamSelesaiStr = formatTime(endTime) // Format: "HH:MM"
+  const jamMulaiStr = formatTime(startTime) 
+  const jamSelesaiStr = formatTime(endTime) 
 
-  // 🛠️ TRIGGER FILTER WAKTU: Abaikan meeting di luar jam 09:00 - 18:00
-  if (jamMulaiStr < '09:00' || jamSelesaiStr > '18:00') {
-    return null // Mengembalikan null agar bisa disaring keluar di backend/loop frontend
+  // Filter jam kerja (09:00 - 18:00)
+  if (jamMulaiStr < '09:00' || jamMulaiStr > '18:00') {
+    return null 
   }
 
-  // Membuat ID acak murni yang ramah bagi Supabase untuk menghindari konflik balapan data (race condition)
-  const randomSuffix = Math.random().toString(36).substring(2, 7)
-  const uniqueId = `goo-${jamMulaiStr.replace(':', '')}-${randomSuffix}`
+  // FORCE ID UNIK: Gunakan ID gabungan antara ID Event dan Tanggal 
+  // Ini memastikan Exception Event dari recurring meeting tidak tabrakan di Supabase
+  const eventDate = formatDate(startTime)
+  const cleanId = (event.id || '').replace(/[^a-zA-Z0-9]/g, '')
+  const uniqueId = `goo-${cleanId.substring(0, 30)}-${eventDate}`
 
   return {
     id: uniqueId,
@@ -67,7 +69,7 @@ export const mapGoogleEventToActivity = (event, userEmail, teamId) => {
     priority: 'P2', 
     progress: 0,
     kategoriKerja: 'Meeting', 
-    date: formatDate(startTime),
+    date: eventDate,
     documents: {
       csv: { name: '', uploaded: false },
       doc: { name: '', uploaded: false },
