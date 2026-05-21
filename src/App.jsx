@@ -1,146 +1,234 @@
-import { useState, useMemo } from 'react'
-import { ChevronRight, Users, BarChart3, PieChart as PieIcon, Activity } from 'lucide-react'
+/**
+ * App.jsx — GERBANG UTAMA AUTENTIKASI SUPABASE AUTH & REALTIME DASHBOARD
+ */
+import React, { useState, useMemo, useEffect } from 'react'
+import { ChevronRight, Users, GripVertical, FolderArchive } from 'lucide-react'
+import { supabase } from './lib/supabase' // 🛡️ Import instance supabase Anda
 import { DashboardProvider, useDash } from './contexts/DashboardContext.jsx'
-import Sidebar     from './components/Sidebar.jsx'
-import Header      from './components/Header.jsx'
-import StatCards   from './components/StatCards.jsx'
-import ActivityTable from './components/ActivityTable.jsx'
-import PICCard     from './components/PICCard.jsx'
-import Card        from './components/ui/Card.jsx'
-import { cn, fmtLong } from './constants/helpers.js'
+import Sidebar from './components/Sidebar.jsx'
+import Header from './components/Header.jsx'
+import StatCards from './components/StatCards.jsx'
 import DashboardCharts from './components/DashboardCharts.jsx'
+import ActivityTable from './components/ActivityTable.jsx'
+import PICCard from './components/PICCard.jsx'
+import Card from './components/ui/Card.jsx'
+import Login from './components/Auth.jsx' // 🛡️ Diarahkan langsung ke folder src/components/Auth.jsx
+import { cn, fmtLong } from './constants/helpers.js'
 
-function DashboardContent({ onMenu }) {
+function DashboardContent({ onMenu, userSession }) {
   const {
     activeTeam, selDate, selPIC,
     setSelPIC, selectDate,
     getTeam, getActsByDate, getPICs, getStats,
-    loading // <-- 1. Ambil state loading dari Context Anda
+    loading,
   } = useDash()
 
   const [editMode, setEditMode] = useState(false)
+  const team = getTeam()
 
-  // --- 2. PASANG LOADING GATE DI SINI (MENAHAN CRASH) ---
+  const pics = useMemo(() => {
+    if (!activeTeam) return []
+    return getPICs(activeTeam, selDate || null) || []
+  }, [selDate, activeTeam, getPICs])
+
+  const tableActs = useMemo(() => {
+    if (!team) return []
+    const baseActs = getActsByDate(activeTeam, selDate || null) || []
+    if (selPIC) {
+      return baseActs.filter(a => a?.pic === selPIC)
+    }
+    return baseActs
+  }, [team, selDate, selPIC, activeTeam, getActsByDate])
+
   if (loading) {
     return (
-      <div className="flex flex-1 flex-col h-screen w-full items-center justify-center bg-[#0f172a] text-slate-200">
+      <div className="flex flex-1 h-screen w-full items-center justify-center bg-[#0f172a]">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
-          <p className="text-sm font-medium text-slate-400">Menghubungkan ke Supabase...</p>
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+          <p className="text-sm text-slate-400">Menghubungkan ke Supabase…</p>
         </div>
       </div>
     )
   }
 
-  const team = getTeam()
-  
-  // Mengambil stats real-time berdasarkan filter yang aktif
-  const stats = getStats(activeTeam, selDate || undefined, selPIC || undefined)
-  
-  const tableActs = useMemo(() => {
-    if (!team) return []
-    if (selDate && selPIC) {
-      return getActsByDate(activeTeam, selDate).filter(a => a.pic === selPIC)
-    }
-    return !selDate ? (team.activities || []) : getActsByDate(activeTeam, selDate)
-  }, [team, selDate, selPIC, activeTeam, getActsByDate])
+  const stats = getStats(activeTeam, selDate || null, selPIC || null) || {
+    total: 0, done: 0, onProg: 0, p0: 0, p1: 0, p2: 0, p3: 0,
+  }
 
-  const pics = (selDate && !selPIC) ? getPICs(activeTeam, selDate) : []
+  const showPICs  = !!activeTeam && !selPIC && pics.length > 0
+  const showTable = !!activeTeam
+  const picName   = selPIC ? selPIC.split('@')[0] : null
 
   return (
     <div className="flex flex-1 flex-col min-h-screen bg-[#0f172a] text-slate-200">
       <Header editMode={editMode} onEditMode={setEditMode} onMenu={onMenu} />
 
-      <main className="flex-1 p-4 lg:p-8 flex flex-col gap-6 max-w-[1600px] w-full mx-auto">
+      <main className="flex-1 p-4 lg:p-6 flex flex-col gap-6 max-w-[1600px] w-full mx-auto">
         
-        {/* Header Title & Breadcrumb */}
+        {/* BREADCRUMBS NAVIGATION */}
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-bold tracking-tight text-white">
-            {selPIC ? selPIC.split('@')[0] : team?.name || 'Global Overview'}
+            {selPIC ? (
+              <span className="capitalize">{picName}</span>
+            ) : (
+              team?.name || 'Global Overview'
+            )}
           </h1>
-          <nav className="flex items-center gap-2 text-xs text-slate-500 uppercase font-bold tracking-widest">
-            <span 
-              className="cursor-pointer hover:text-blue-400 transition-colors" 
+          <nav className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+            <button
+              type="button"
               onClick={() => { selectDate(null); setSelPIC(null) }}
+              className="hover:text-blue-400 transition-colors bg-transparent border-none cursor-pointer p-0 text-slate-500 uppercase font-black text-[10px] tracking-widest focus:outline-none"
             >
               Dashboard
+            </button>
+            <ChevronRight size={10} />
+            <span className={cn(selDate ? 'text-blue-400' : 'text-slate-300')}>
+              {team?.name || 'All Teams'}
             </span>
-            <ChevronRight size={12} />
-            <span className={cn(selDate && "text-blue-400")}>{team?.name || 'All Teams'}</span>
             {selDate && (
               <>
-                <ChevronRight size={12} />
-                <span className="text-slate-300">{fmtLong(selDate)}</span>
+                <ChevronRight size={10} />
+                {selPIC ? (
+                  <button
+                    type="button"
+                    onClick={() => setSelPIC(null)}
+                    className="hover:text-blue-400 transition-colors bg-transparent border-none cursor-pointer p-0 text-slate-500 uppercase font-black text-[10px] tracking-widest focus:outline-none"
+                  >
+                    {fmtLong(selDate)}
+                  </button>
+                ) : (
+                  <span className="text-slate-300">{fmtLong(selDate)}</span>
+                )}
+              </>
+            )}
+            {selPIC && (
+              <>
+                <ChevronRight size={10} />
+                <span className="text-white">{picName}</span>
               </>
             )}
           </nav>
         </div>
 
-        {/* 1. Stat Cards */}
+        {/* STAT CARDS */}
         <StatCards stats={stats} selPIC={selPIC} selDate={selDate} editMode={editMode} />
 
-        {/* 2. Charts Section */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <Card className="xl:col-span-2 p-6 bg-[#1e293b]/50 border-slate-800 shadow-xl backdrop-blur-sm">
-             <div className="flex items-center gap-2 mb-6">
-                <BarChart3 size={18} className="text-blue-400" />
-                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300">Performance Analytics</h3>
-             </div>
-             <DashboardCharts stats={stats} viewType="bar" />
-          </Card>
+        {/* CHARTS */}
+        {showTable && <DashboardCharts activities={tableActs} stats={stats} />}
 
-          <Card className="p-6 bg-[#1e293b]/50 border-slate-800 shadow-xl backdrop-blur-sm">
-            <div className="flex items-center gap-2 mb-6">
-                <PieIcon size={18} className="text-teal-400" />
-                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300">Activity Composition</h3>
-             </div>
-            <DashboardCharts stats={stats} viewType="pie" />
-          </Card>
-        </div>
-
-        {/* 3. Bottom Detail Section */}
-        <div className="grid grid-cols-1 gap-6">
-          {selPIC ? (
-            <Card className="p-6 border-slate-800 bg-[#1e293b]/30">
-              <div className="flex items-center gap-2 mb-6">
-                <Activity size={18} className="text-purple-400" />
-                <h2 className="text-sm font-bold uppercase tracking-wider">Detailed Task Logs</h2>
-              </div>
-              <ActivityTable activities={tableActs} teamId={activeTeam} />
-            </Card>
-          ) : selDate ? (
-            <div className="flex flex-col gap-4">
-               <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-2 px-1">
-                <Users size={14} /> Team Personnel Breakdown
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {pics.map(pd => (
-                  <PICCard key={pd.pic} picData={pd} onClick={() => setSelPIC(pd.pic)} />
-                ))}
-              </div>
+        {/* PERSONNEL BREAKDOWN */}
+        {showPICs && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2">
+              <Users size={14} className="text-slate-500" />
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">
+                Team Personnel Breakdown
+              </span>
             </div>
-          ) : (
-            <Card className="p-6 border-slate-800 bg-[#1e293b]/30">
-              <h2 className="text-sm font-bold uppercase tracking-wider mb-6">Team Activity Overview</h2>
-              <ActivityTable activities={tableActs} teamId={activeTeam} />
-            </Card>
-          )}
-        </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {pics.map(pd => (
+                <PICCard key={pd.pic} picData={pd} onClick={() => setSelPIC(pd.pic)} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* TIM BELUM DIPILIH */}
+        {!team && (
+          <div className="flex flex-col items-center py-16 text-center border border-dashed border-slate-800 rounded-2xl bg-slate-900/10">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 bg-[#0f1629] border border-[#1e2d4a]">
+              <FolderArchive size={28} className="text-slate-600" />
+            </div>
+            <p className="text-slate-400 font-semibold">Folder Tim Belum Terpilih</p>
+            <p className="text-slate-600 text-sm mt-1">Silakan pilih folder tim di sidebar terlebih dahulu.</p>
+          </div>
+        )}
+
+        {/* TABEL AKTIVITAS */}
+        {team && showTable && (
+          <Card className={cn('p-5 relative border border-slate-800', editMode && 'ring-2 ring-blue-500/30 ring-dashed')}>
+            {editMode && (
+              <div className="absolute -top-2 -left-2 bg-blue-600 rounded-full p-1 shadow-md">
+                <GripVertical size={12} className="text-white" />
+              </div>
+            )}
+            <div className="flex items-center gap-2 mb-5">
+              <div className="w-1 h-5 rounded-full bg-blue-500" />
+              <h2 className="text-sm font-black text-slate-200 uppercase tracking-wider">
+                {selPIC
+                  ? `Aktivitas — ${picName}`
+                  : selDate
+                    ? `Aktivitas Harian — ${team.name}`
+                    : `Semua Aktivitas — ${team.name}`}
+              </h2>
+            </div>
+            <ActivityTable activities={tableActs} teamId={activeTeam} userSession={userSession} />
+          </Card>
+        )}
+
+        {/* FLOATING EDIT BADGE */}
+        {editMode && (
+          <div
+            className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-5 py-2.5 rounded-full shadow-2xl flex items-center gap-2 text-sm font-bold border border-blue-500 select-none"
+            style={{ zIndex: 9997 }}
+          >
+            <GripVertical size={16} />Mode Edit Aktif
+          </div>
+        )}
       </main>
     </div>
   )
 }
 
-export default function App() {
+function AppShell({ userSession }) {
   const [sbOpen, setSbOpen] = useState(false)
   return (
-    <DashboardProvider>
-      <div className="flex h-screen overflow-hidden bg-[#0f172a]">
-        <Sidebar isOpen={sbOpen} onClose={() => setSbOpen(false)} />
-        <div className="flex-1 overflow-y-auto">
-          <DashboardContent onMenu={() => setSbOpen(true)} />
-        </div>
+    <div className="flex h-screen overflow-hidden bg-[#0f172a]">
+      <Sidebar isOpen={sbOpen} onClose={() => setSbOpen(false)} />
+      <div className="flex-1 overflow-y-auto">
+        <DashboardContent onMenu={() => setSbOpen(true)} userSession={userSession} />
       </div>
+    </div>
+  )
+}
+
+export default function App() {
+  const [session, setSession] = useState(null)
+  const [initializing, setInitializing] = useState(true)
+
+  useEffect(() => {
+    // Ambil sesi aktif saat pertama kali aplikasi dibuka
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      setInitializing(false)
+    })
+
+    // Dengarkan perubahan status login/logout secara realtime
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  if (initializing) {
+    return (
+      <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+      </div>
+    )
+  }
+
+  // Jika tidak ada sesi login, tampilkan halaman Login bawaan (Auth.jsx)
+  if (!session) {
+    return <Login />
+  }
+
+  // Jika sudah login, tampilkan seluruh Dashboard Provider utama Anda
+  return (
+    <DashboardProvider>
+      <AppShell userSession={session} />
     </DashboardProvider>
   )
 }
