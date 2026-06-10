@@ -1,5 +1,5 @@
 /**
- * Sidebar.jsx — RE-FIXED WITH MONTH ACCORDION / DROPDOWN TOGGLE
+ * Sidebar.jsx — RE-FIXED WITH INTERACTIVE TEAM FOLDERS & MONTH ACCORDIONS
  */
 import React, { useState, useMemo } from 'react'
 import { Folder, Plus, ChevronRight, Settings, Users, ShieldAlert, BarChart3, LayoutDashboard, FolderPlus, Calendar } from 'lucide-react'
@@ -59,7 +59,10 @@ export default function Sidebar() {
 
   const [modalOpen, setModalOpen] = useState(false)
   
-  // 🛠️ STATE BARU: Menyimpan status buka/tutup dropdown bulan { [monthKey]: boolean }
+  // 🛠️ STATE BARU: Melacak folder tim mana saja yang sedang terbuka dropdown-nya
+  const [openTeams, setOpenTeams] = useState({})
+  
+  // State melacak status buka/tutup dropdown bulan
   const [openMonths, setOpenMonths] = useState({})
 
   const getMonthName = (monthStr) => {
@@ -110,7 +113,22 @@ export default function Sidebar() {
     return finalSortedGroups
   }, [activities])
 
-  // 🛠️ FUNGSI BARU: Toggle buka/tutup dropdown untuk bulan tertentu
+  // 🛠️ FUNGSI BARU: Toggle buka/tutup folder tim sekaligus set active team
+  const handleTeamClick = (teamId) => {
+    const tIdStr = String(teamId)
+    
+    // 1. Set team aktif di global context
+    setActiveTeam(teamId)
+    if (typeof selectDate === 'function') selectDate(null)
+    if (typeof setSelPIC === 'function') setSelPIC(null)
+
+    // 2. Toggle status expand/collapse folder lokal
+    setOpenTeams(prev => ({
+      ...prev,
+      [tIdStr]: !prev[tIdStr]
+    }))
+  }
+
   const toggleMonth = (monthKey) => {
     setOpenMonths(prev => ({
       ...prev,
@@ -157,20 +175,20 @@ export default function Sidebar() {
               <p className="text-xs text-slate-600 px-2 italic py-2">Belum ada folder tim</p>
             ) : (
               teams.map((t) => {
+                const tIdStr = String(t.id)
                 const isActive = t.id === activeTeam
+                // Folder dianggap terbuka jika state openTeams bernilai true ATAU folder tersebut sedang aktif diklik
+                const isTeamOpen = !!openTeams[tIdStr] || isActive
+                
                 const targetedIcon = t.icon || t.iconName || 'Folder'
-                const teamDates = allStructuredDates[String(t.id)] || {}
+                const teamDates = allStructuredDates[tIdStr] || {}
 
                 return (
                   <div key={t.id} className="space-y-1">
-                    {/* BUTTON UTAMA FOLDER TIM */}
+                    {/* BUTTON UTAMA FOLDER TIM (SEKARANG INTERAKTIF) */}
                     <button
                       type="button"
-                      onClick={() => {
-                        setActiveTeam(t.id)
-                        if (typeof selectDate === 'function') selectDate(null)
-                        if (typeof setSelPIC === 'function') setSelPIC(null)
-                      }}
+                      onClick={() => handleTeamClick(t.id)}
                       className={cn(
                         "w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all border-none text-left cursor-pointer",
                         isActive 
@@ -184,20 +202,27 @@ export default function Sidebar() {
                         </span>
                         <span className="truncate">{t.name}</span>
                       </div>
-                      <ChevronRight size={12} className={cn("transition-transform text-slate-600", isActive && "transform rotate-90 text-blue-400")} />
+                      {/* Ikon Chevron berputar menyesuaikan status isTeamOpen */}
+                      <ChevronRight 
+                        size={12} 
+                        className={cn(
+                          "transition-transform text-slate-600", 
+                          isTeamOpen && "transform rotate-90",
+                          isActive && "text-blue-400"
+                        )} 
+                      />
                     </button>
 
-                    {/* DROPDOWN SUB-MENU: BULAN */}
-                    {isActive && Object.keys(teamDates).length > 0 && (
+                    {/* DROPDOWN SUB-MENU BULAN: Hanya merender komponen jika isTeamOpen bernilai TRUE */}
+                    {isTeamOpen && Object.keys(teamDates).length > 0 && (
                       <div className="pl-4 ml-3 border-l border-slate-800/60 space-y-1 pt-1 pb-2">
                         {Object.keys(teamDates).map(monthKey => {
                           const [year, month] = monthKey.split('-')
-                          // Cek apakah bulan ini diklik/buka (default: false / tertutup)
                           const isMonthOpen = !!openMonths[monthKey]
 
                           return (
                             <div key={monthKey} className="space-y-1">
-                              {/* 🛠️ IMPROVEMENT: Mengubah label bulan statis menjadi tombol dropdown click */}
+                              {/* Label/Tombol Dropdown Bulan */}
                               <button
                                 type="button"
                                 onClick={() => toggleMonth(monthKey)}
@@ -210,7 +235,7 @@ export default function Sidebar() {
                                 />
                               </button>
 
-                              {/* Daftar Tanggal di dalam bulan (Hanya muncul jika isMonthOpen === true) */}
+                              {/* Daftar Tanggal */}
                               {isMonthOpen && (
                                 <div className="space-y-0.5 pl-1 transition-all">
                                   {teamDates[monthKey].map(dateStr => {
