@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, Edit3, Check, Menu, User, Settings, Mail, LogOut } from 'lucide-react'
-import Btn from './ui/Btn.jsx'
+import { ChevronDown, Menu, User, Settings, Mail, LogOut } from 'lucide-react'
 import Drop from './ui/Drop.jsx'
 import ProfileModal      from './modals/ProfileModal.jsx'
 import SettingsModal     from './modals/SettingsModal.jsx'
@@ -9,6 +8,7 @@ import { useIsMobile }   from '../hooks/useIsMobile.js'
 // Import Supabase
 import { supabase } from '../lib/supabase'
 
+// EditMode dan onEditMode bisa tetap dibiarkan di parameter agar tidak membuat error komponen Parent (App.jsx/Dashboard.jsx)
 export default function Header({ editMode, onEditMode, onMenu }) {
   const isMobile = useIsMobile()
 
@@ -27,12 +27,10 @@ export default function Header({ editMode, onEditMode, onMenu }) {
       sessionStorage.clear()
 
       // 3. Paksa pindah halaman ke /login
-      // Menggunakan replace agar user tidak bisa klik tombol 'Back' untuk masuk lagi
       window.location.replace('/auth')
 
     } catch (error) {
       console.error('Error logging out:', error.message)
-      // Jika error sekalipun (misal masalah jaringan), tetap lempar ke halaman login
       window.location.replace('/auth')
     }
   }
@@ -52,23 +50,13 @@ export default function Header({ editMode, onEditMode, onMenu }) {
             Working Tracker{' '}
             <span className="font-normal text-slate-600">IA &amp; RM</span>
           </span>
-          {editMode && (
-            <span className="text-xs bg-blue-500/15 text-blue-400 px-2.5 py-1 rounded-full font-black border border-blue-500/25">
-              Edit Mode
-            </span>
-          )}
         </div>
 
         {/* Right */}
         <div className="flex items-center gap-1.5">
-          <Btn
-            variant={editMode ? 'primary' : 'outline'}
-            size="sm"
-            onClick={() => onEditMode(!editMode)}
-            className="hidden sm:flex gap-1.5"
-          >
-            {editMode ? <><Check size={14} />Done</> : <><Edit3 size={14} />Edit</>}
-          </Btn>
+          {/* Tombol <Btn> Edit sebelumnya di sini sudah DIHAPUS TOTAL 
+            agar UI bersih dan fokus perubahan dialihkan ke SettingsModal
+          */}
 
           <Drop
             align="right"
@@ -91,15 +79,15 @@ export default function Header({ editMode, onEditMode, onMenu }) {
               </button>
             }
             items={[
-              { label: 'Profile',          icon: <User      size={14} />, onClick: () => setProfileOpen(true)  },
-              { label: 'Settings',         icon: <Settings size={14} />, onClick: () => setSettingsOpen(true) },
+              { label: 'Profile',         icon: <User      size={14} />, onClick: () => setProfileOpen(true)  },
+              { label: 'Settings',        icon: <Settings size={14} />, onClick: () => setSettingsOpen(true) },
               { label: 'Connect by Email', icon: <Mail      size={14} />, onClick: () => setEmailOpen(true)    },
               'sep',
               { 
                 label: 'Logout', 
                 icon: <LogOut size={14} />, 
                 danger: true,
-                onClick: handleLogout // Menjalankan fungsi logout yang sudah diperbaiki
+                onClick: handleLogout
               },
             ]}
           />
