@@ -1,5 +1,5 @@
 /**
- * Sidebar.jsx — RE-FIXED ANTI-CRASH (COMPLIANT WITH REACT HOOK RULES)
+ * Sidebar.jsx — RE-FIXED WITH MONTH ACCORDION / DROPDOWN TOGGLE
  */
 import React, { useState, useMemo } from 'react'
 import { Folder, Plus, ChevronRight, Settings, Users, ShieldAlert, BarChart3, LayoutDashboard, FolderPlus, Calendar } from 'lucide-react'
@@ -9,7 +9,6 @@ import { cn } from '../constants/helpers.js'
 
 const AddFolderModal = Modals.AddFolderModal;
 
-// Fungsi Render Ikon Berlapis - Menjamin proteksi crash 100%
 function renderFolderIcon(iconTarget) {
   if (!iconTarget) return <Folder size={16} />
 
@@ -47,21 +46,22 @@ function renderFolderIcon(iconTarget) {
 }
 
 export default function Sidebar() {
-  // Ambil state dari context global Anda
   const { 
     teams, 
     activeTeam, 
     setActiveTeam, 
     addTeam,
-    activities, // Menarik seluruh daftar aktivitas global untuk pelacakan tanggal
+    activities, 
     selDate,
     selectDate,
     setSelPIC
   } = useDash()
 
   const [modalOpen, setModalOpen] = useState(false)
+  
+  // 🛠️ STATE BARU: Menyimpan status buka/tutup dropdown bulan { [monthKey]: boolean }
+  const [openMonths, setOpenMonths] = useState({})
 
-  // Fungsi pembantu konversi nama bulan Indonesia
   const getMonthName = (monthStr) => {
     const months = {
       '01': 'Januari', '02': 'Februari', '03': 'Maret', '04': 'April',
@@ -71,20 +71,18 @@ export default function Sidebar() {
     return months[monthStr] || monthStr
   }
 
-  // 🔥 SOLUSI UTAMA: Kelompokkan data tanggal AKTIVITAS GLOBAL di sini (DI LUAR LOOP .MAP)
-  // Ini mencegah error "Rendered more hooks than during the previous render" 
+  // Kelompokkan data tanggal aktivitas global
   const allStructuredDates = useMemo(() => {
     const sourceActs = activities || []
     if (!Array.isArray(sourceActs)) return {}
 
-    // Kerangka grup: { [teamId]: { [monthKey]: Set(dates) } }
     const groupsByTeam = {}
 
     sourceActs.forEach(act => {
       const actTeamId = act.team_id || act.teamId
       if (!actTeamId || !act?.date) return
 
-      const parts = act.date.split('-') // Mengurai 'YYYY-MM-DD'
+      const parts = act.date.split('-') 
       if (parts.length < 2) return
 
       const year = parts[0]
@@ -101,7 +99,6 @@ export default function Sidebar() {
       groupsByTeam[tIdStr][monthKey].add(act.date)
     })
 
-    // Lakukan sorting urutan terbaru (descending) untuk setiap tim
     const finalSortedGroups = {}
     Object.keys(groupsByTeam).forEach(tId => {
       finalSortedGroups[tId] = {}
@@ -112,6 +109,14 @@ export default function Sidebar() {
 
     return finalSortedGroups
   }, [activities])
+
+  // 🛠️ FUNGSI BARU: Toggle buka/tutup dropdown untuk bulan tertentu
+  const toggleMonth = (monthKey) => {
+    setOpenMonths(prev => ({
+      ...prev,
+      [monthKey]: !prev[monthKey]
+    }))
+  }
 
   const handleCreateFolder = async (name, icon) => {
     try {
@@ -154,8 +159,6 @@ export default function Sidebar() {
               teams.map((t) => {
                 const isActive = t.id === activeTeam
                 const targetedIcon = t.icon || t.iconName || 'Folder'
-                
-                // Ambil data tanggal terstruktur khusus untuk ID tim ini saja
                 const teamDates = allStructuredDates[String(t.id)] || {}
 
                 return (
@@ -184,45 +187,58 @@ export default function Sidebar() {
                       <ChevronRight size={12} className={cn("transition-transform text-slate-600", isActive && "transform rotate-90 text-blue-400")} />
                     </button>
 
-                    {/* DROPDOWN SUB-MENU: BULAN -> TANGGAL */}
+                    {/* DROPDOWN SUB-MENU: BULAN */}
                     {isActive && Object.keys(teamDates).length > 0 && (
-                      <div className="pl-6 ml-2 border-l border-slate-800 space-y-2.5 pt-1 pb-2">
+                      <div className="pl-4 ml-3 border-l border-slate-800/60 space-y-1 pt-1 pb-2">
                         {Object.keys(teamDates).map(monthKey => {
                           const [year, month] = monthKey.split('-')
+                          // Cek apakah bulan ini diklik/buka (default: false / tertutup)
+                          const isMonthOpen = !!openMonths[monthKey]
+
                           return (
                             <div key={monthKey} className="space-y-1">
-                              {/* Label Bulan */}
-                              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-2 py-0.5">
-                                {getMonthName(month)} {year}
-                              </div>
+                              {/* 🛠️ IMPROVEMENT: Mengubah label bulan statis menjadi tombol dropdown click */}
+                              <button
+                                type="button"
+                                onClick={() => toggleMonth(monthKey)}
+                                className="w-full flex items-center justify-between text-[10px] font-bold text-slate-500 hover:text-slate-300 uppercase tracking-wider px-2 py-1 bg-transparent border-none cursor-pointer rounded transition-colors"
+                              >
+                                <span>{getMonthName(month)} {year}</span>
+                                <ChevronRight 
+                                  size={10} 
+                                  className={cn("transition-transform text-slate-600", isMonthOpen && "transform rotate-90 text-slate-400")} 
+                                />
+                              </button>
 
-                              {/* Daftar Tanggal */}
-                              <div className="space-y-0.5">
-                                {teamDates[monthKey].map(dateStr => {
-                                  const isDateActive = selDate === dateStr
-                                  const dayNum = dateStr.split('-')[2] || dateStr
+                              {/* Daftar Tanggal di dalam bulan (Hanya muncul jika isMonthOpen === true) */}
+                              {isMonthOpen && (
+                                <div className="space-y-0.5 pl-1 transition-all">
+                                  {teamDates[monthKey].map(dateStr => {
+                                    const isDateActive = selDate === dateStr
+                                    const dayNum = dateStr.split('-')[2] || dateStr
 
-                                  return (
-                                    <button
-                                      key={dateStr}
-                                      type="button"
-                                      onClick={() => {
-                                        if (typeof selectDate === 'function') selectDate(dateStr)
-                                        if (typeof setSelPIC === 'function') setSelPIC(null)
-                                      }}
-                                      className={cn(
-                                        "w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors border-none text-left cursor-pointer",
-                                        isDateActive 
-                                          ? "bg-slate-800 text-white font-bold" 
-                                          : "bg-transparent text-slate-500 hover:bg-slate-800/40 hover:text-slate-300"
-                                      )}
-                                    >
-                                      <Calendar size={11} className={isDateActive ? "text-blue-400" : "text-slate-600"} />
-                                      <span>Tanggal {dayNum}</span>
-                                    </button>
-                                  )
-                                })}
-                              </div>
+                                    return (
+                                      <button
+                                        key={dateStr}
+                                        type="button"
+                                        onClick={() => {
+                                          if (typeof selectDate === 'function') selectDate(dateStr)
+                                          if (typeof setSelPIC === 'function') setSelPIC(null)
+                                        }}
+                                        className={cn(
+                                          "w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors border-none text-left cursor-pointer",
+                                          isDateActive 
+                                            ? "bg-slate-800 text-white font-bold" 
+                                            : "bg-transparent text-slate-500 hover:bg-slate-800/40 hover:text-slate-300"
+                                        )}
+                                      >
+                                        <Calendar size={11} className={isDateActive ? "text-blue-400" : "text-slate-600"} />
+                                        <span>Tanggal {dayNum}</span>
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                              )}
                             </div>
                           )
                         })}
