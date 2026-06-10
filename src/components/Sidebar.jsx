@@ -1,13 +1,11 @@
 /**
- * Sidebar.jsx — FIXED COLLAPSIBLE TEAM FOLDERS
+ * Sidebar.jsx — FIXED WITH INTEGRATED CUSTOM BASE64 RENDERER
  */
 import React, { useState, useMemo, useEffect } from 'react'
 import { Folder, Plus, ChevronRight, Settings, Users, ShieldAlert, BarChart3, LayoutDashboard, FolderPlus, Calendar } from 'lucide-react'
 import { useDash } from '../contexts/DashboardContext.jsx'
 import * as Modals from './modals/FolderModal.jsx' 
 import { cn } from '../constants/helpers.js'
-
-const AddFolderModal = Modals.AddFolderModal;
 
 function renderFolderIcon(iconTarget) {
   if (!iconTarget) return <Folder size={16} />
@@ -28,6 +26,17 @@ function renderFolderIcon(iconTarget) {
   const name = typeof iconTarget === 'string' 
     ? iconTarget 
     : String(iconTarget.name || iconTarget.displayName || iconTarget.iconName || 'Folder');
+
+  // ✨ DETEKSI UTAMA: Jika string diawali dengan format data gambar, render sebagai tag HTML img kustom
+  if (name.startsWith('data:image/')) {
+    return (
+      <img 
+        src={name} 
+        alt="Team Icon" 
+        className="w-4 h-4 object-contain rounded-sm"
+      />
+    )
+  }
 
   switch (name) {
     case 'Users': 
@@ -58,14 +67,9 @@ export default function Sidebar() {
   } = useDash()
 
   const [modalOpen, setModalOpen] = useState(false)
-  
-  // State melacak folder tim mana saja yang terbuka dropdown-nya
   const [openTeams, setOpenTeams] = useState({})
-  
-  // State melacak status buka/tutup dropdown bulan
   const [openMonths, setOpenMonths] = useState({})
 
-  // ✨ OTOMATIS BUKA TIM AKTIF SAAT PERTAMA KALI KELUAR
   useEffect(() => {
     if (activeTeam) {
       setOpenTeams(prev => ({
@@ -84,7 +88,6 @@ export default function Sidebar() {
     return months[monthStr] || monthStr
   }
 
-  // Kelompokkan data tanggal aktivitas global
   const allStructuredDates = useMemo(() => {
     const sourceActs = activities || []
     if (!Array.isArray(sourceActs)) return {}
@@ -123,16 +126,12 @@ export default function Sidebar() {
     return finalSortedGroups
   }, [activities])
 
-  // Toggle buka/tutup folder tim sekaligus set active team
   const handleTeamClick = (teamId) => {
     const tIdStr = String(teamId)
-    
-    // 1. Set team aktif di global context
     setActiveTeam(teamId)
     if (typeof selectDate === 'function') selectDate(null)
     if (typeof setSelPIC === 'function') setSelPIC(null)
 
-    // 2. Toggle status expand/collapse folder lokal secara independen
     setOpenTeams(prev => ({
       ...prev,
       [tIdStr]: !prev[tIdStr]
@@ -187,8 +186,6 @@ export default function Sidebar() {
               teams.map((t) => {
                 const tIdStr = String(t.id)
                 const isActive = t.id === activeTeam
-                
-                // 🛠️ FIX DI SINI: Singkirkan `|| isActive` agar murni dikontrol oleh state klik user
                 const isTeamOpen = !!openTeams[tIdStr]
                 
                 const targetedIcon = t.icon || t.iconName || 'Folder'
@@ -196,7 +193,6 @@ export default function Sidebar() {
 
                 return (
                   <div key={t.id} className="space-y-1">
-                    {/* BUTTON UTAMA FOLDER TIM */}
                     <button
                       type="button"
                       onClick={() => handleTeamClick(t.id)}
@@ -208,7 +204,7 @@ export default function Sidebar() {
                       )}
                     >
                       <div className="flex items-center gap-2.5 truncate">
-                        <span className={isActive ? "text-blue-400" : "text-slate-500"}>
+                        <span className={isActive ? "text-blue-400 flex items-center" : "text-slate-500 flex items-center"}>
                           {renderFolderIcon(targetedIcon)}
                         </span>
                         <span className="truncate">{t.name}</span>
@@ -223,7 +219,6 @@ export default function Sidebar() {
                       />
                     </button>
 
-                    {/* DROPDOWN SUB-MENU BULAN */}
                     {isTeamOpen && Object.keys(teamDates).length > 0 && (
                       <div className="pl-4 ml-3 border-l border-slate-800/60 space-y-1 pt-1 pb-2">
                         {Object.keys(teamDates).map(monthKey => {
@@ -232,7 +227,6 @@ export default function Sidebar() {
 
                           return (
                             <div key={monthKey} className="space-y-1">
-                              {/* Label/Tombol Dropdown Bulan */}
                               <button
                                 type="button"
                                 onClick={() => toggleMonth(monthKey)}
@@ -245,7 +239,6 @@ export default function Sidebar() {
                                 />
                               </button>
 
-                              {/* Daftar Tanggal */}
                               {isMonthOpen && (
                                 <div className="space-y-0.5 pl-1 transition-all">
                                   {teamDates[monthKey].map(dateStr => {
@@ -294,8 +287,8 @@ export default function Sidebar() {
         </button>
       </div>
 
-      {AddFolderModal && (
-        <AddFolderModal 
+      {Modals.AddFolderModal && (
+        <Modals.AddFolderModal 
           open={modalOpen} 
           onClose={() => setModalOpen(false)} 
           onAdd={handleCreateFolder} 
