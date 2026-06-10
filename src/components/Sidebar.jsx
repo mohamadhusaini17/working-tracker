@@ -1,10 +1,12 @@
 /**
- * Sidebar.jsx — FIXED WITH INTEGRATED CUSTOM BASE64 RENDERER
+ * Sidebar.jsx — FIXED WITH COLLAPSIBLE TRACKING & STRICT SAFETY DELETE GUARD
  */
 import React, { useState, useMemo, useEffect } from 'react'
-import { Folder, Plus, ChevronRight, Settings, Users, ShieldAlert, BarChart3, LayoutDashboard, FolderPlus, Calendar } from 'lucide-react'
+import { Folder, Plus, ChevronRight, Settings, Users, ShieldAlert, BarChart3, LayoutDashboard, FolderPlus, Calendar, Trash2, AlertTriangle } from 'lucide-react'
 import { useDash } from '../contexts/DashboardContext.jsx'
 import * as Modals from './modals/FolderModal.jsx' 
+import Modal from '../ui/Modal.jsx'
+import Btn from '../ui/Btn.jsx'
 import { cn } from '../constants/helpers.js'
 
 function renderFolderIcon(iconTarget) {
@@ -27,7 +29,6 @@ function renderFolderIcon(iconTarget) {
     ? iconTarget 
     : String(iconTarget.name || iconTarget.displayName || iconTarget.iconName || 'Folder');
 
-  // ✨ DETEKSI UTAMA: Jika string diawali dengan format data gambar, render sebagai tag HTML img kustom
   if (name.startsWith('data:image/')) {
     return (
       <img 
@@ -39,18 +40,12 @@ function renderFolderIcon(iconTarget) {
   }
 
   switch (name) {
-    case 'Users': 
-      return <Users size={16} />
-    case 'BarChart3': 
-      return <BarChart3 size={16} />
-    case 'ShieldAlert': 
-      return <ShieldAlert size={16} />
-    case 'FolderPlus': 
-      return <FolderPlus size={16} />
-    case 'Folder': 
-      return <Folder size={16} />
-    default: 
-      return <Folder size={16} />
+    case 'Users': return <Users size={16} />
+    case 'BarChart3': return <BarChart3 size={16} />
+    case 'ShieldAlert': return <ShieldAlert size={16} />
+    case 'FolderPlus': return <FolderPlus size={16} />
+    case 'Folder': return <Folder size={16} />
+    default: return <Folder size={16} />
   }
 }
 
@@ -60,6 +55,7 @@ export default function Sidebar() {
     activeTeam, 
     setActiveTeam, 
     addTeam,
+    deleteTeam, // 🌟 Tarik fungsi deleteTeam dari global context Anda
     activities, 
     selDate,
     selectDate,
@@ -69,6 +65,11 @@ export default function Sidebar() {
   const [modalOpen, setModalOpen] = useState(false)
   const [openTeams, setOpenTeams] = useState({})
   const [openMonths, setOpenMonths] = useState({})
+
+  // 🛠️ STATE BARU UNTUK SAFETY GUARD FITUR HAPUS
+  const [teamToDelete, setTeamToDelete] = useState(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleteErrorOpen, setDeleteErrorOpen] = useState(false)
 
   useEffect(() => {
     if (activeTeam) {
@@ -154,6 +155,39 @@ export default function Sidebar() {
     }
   }
 
+  // 🛠️ FUNGSIONAL UTAMA LOGIKA PENYARING KEAMANAN (SAFETY GUARD)
+  const triggerDeleteCheck = (e, teamObject) => {
+    e.stopPropagation() // Stop click event agar sub-menu bulan tidak ikut terbuka
+    
+    const tIdStr = String(teamObject.id)
+    const teamDates = allStructuredDates[tIdStr] || {}
+    
+    // Hitung total tanggal/aktivitas yang terdaftar di bawah tim id ini
+    const hasActivities = Object.keys(teamDates).length > 0
+
+    setTeamToDelete(teamObject)
+
+    if (hasActivities) {
+      // 🛑 BLOKIR: Masih ada tugas, pemicu popup error alert
+      setDeleteErrorOpen(true)
+    } else {
+      // ✅ LOLOS: Folder murni kosong, buka dialog konfirmasi hapus
+      setDeleteConfirmOpen(true)
+    }
+  }
+
+  const handleExecuteDelete = async (teamId) => {
+    try {
+      if (typeof deleteTeam === 'function') {
+        await deleteTeam(teamId)
+      }
+      setDeleteConfirmOpen(false)
+      setTeamToDelete(null)
+    } catch (err) {
+      console.error("Gagal eksekusi hapus folder tim:", err)
+    }
+  }
+
   return (
     <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col h-screen text-slate-300 select-none">
       <div className="p-4 border-b border-slate-800 flex items-center gap-3">
@@ -192,7 +226,7 @@ export default function Sidebar() {
                 const teamDates = allStructuredDates[tIdStr] || {}
 
                 return (
-                  <div key={t.id} className="space-y-1">
+                  <div key={t.id} className="space-y-1 group"> {/* 🌟 Class group ditambahkan di sini untuk hover trigger */}
                     <button
                       type="button"
                       onClick={() => handleTeamClick(t.id)}
@@ -203,20 +237,33 @@ export default function Sidebar() {
                           : "bg-transparent text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
                       )}
                     >
-                      <div className="flex items-center gap-2.5 truncate">
+                      <div className="flex items-center gap-2.5 truncate flex-1">
                         <span className={isActive ? "text-blue-400 flex items-center" : "text-slate-500 flex items-center"}>
                           {renderFolderIcon(targetedIcon)}
                         </span>
                         <span className="truncate">{t.name}</span>
                       </div>
-                      <ChevronRight 
-                        size={12} 
-                        className={cn(
-                          "transition-transform text-slate-600", 
-                          isTeamOpen && "transform rotate-90",
-                          isActive && "text-blue-400"
-                        )} 
-                      />
+                      
+                      {/* 🌟 ICON ACTIONS WRAPPER */}
+                      <div className="flex items-center gap-2 pl-2">
+                        {/* Tombol Hapus: Muncul hanya ketika folder di-hover */}
+                        <span
+                          onClick={(e) => triggerDeleteCheck(e, t)}
+                          className="p-1 rounded-md text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100 cursor-pointer flex items-center justify-center"
+                          title="Hapus Folder"
+                        >
+                          <Trash2 size={12} />
+                        </span>
+
+                        <ChevronRight 
+                          size={12} 
+                          className={cn(
+                            "transition-transform text-slate-600 group-hover:text-slate-400", 
+                            isTeamOpen && "transform rotate-90",
+                            isActive && "text-blue-400"
+                          )} 
+                        />
+                      </div>
                     </button>
 
                     {isTeamOpen && Object.keys(teamDates).length > 0 && (
@@ -292,6 +339,46 @@ export default function Sidebar() {
           open={modalOpen} 
           onClose={() => setModalOpen(false)} 
           onAdd={handleCreateFolder} 
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* 🛑 BOX POPUP ALERTI: MASIH ADA ISI AKTIVITAS (STRICT SAFETY GUARD)       */}
+      {/* ========================================================================= */}
+      <Modal
+        open={deleteErrorOpen}
+        onClose={() => setDeleteErrorOpen(false)}
+        title="Tidak Dapat Menghapus Folder"
+        size="sm"
+        footer={<Btn onClick={() => setDeleteErrorOpen(false)}>Mengerti</Btn>}
+      >
+        <div className="flex items-start gap-3 pt-1">
+          <div className="p-2 rounded-lg bg-red-500/10 text-red-500 shrink-0">
+            <AlertTriangle size={18} />
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Folder <strong className="text-white">"{teamToDelete?.name}"</strong> tidak dapat dihapus karena masih mendokumentasikan rincian tanggal atau tugas aktif.
+            </p>
+            <p className="text-[11px] text-slate-500 leading-normal">
+              Silakan bersihkan atau kosongkan seluruh log aktivitas di dalam folder ini terlebih dahulu untuk melindungi integritas data tracker.
+            </p>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* ✅ BOX CONFIRMATION LOG: JIKA FOLDER BENAR-BENAR KOSONG                  */}
+      {/* ========================================================================= */}
+      {Modals.DeleteFolderDialog && (
+        <Modals.DeleteFolderDialog
+          open={deleteConfirmOpen}
+          onClose={() => {
+            setDeleteConfirmOpen(false)
+            setTeamToDelete(null)
+          }}
+          team={teamToDelete}
+          onDelete={handleExecuteDelete}
         />
       )}
     </aside>

@@ -251,7 +251,7 @@ export function DeleteFolderDialog({ open, onClose, team, onDelete }) {
       title="Hapus Team Folder"
       desc={
         team
-          ? `Yakin ingin menghapus "${team.name}"? Semua aktivitas di folder ini akan ikut terhapus.`
+          ? `Apakah Anda yakin ingin menghapus folder "${team.name}"? Folder ini kosong dan tindakan ini tidak dapat dibatalkan.`
           : 'Yakin ingin menghapus folder ini?'
       }
     />
