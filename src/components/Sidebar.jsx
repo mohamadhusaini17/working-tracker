@@ -1,7 +1,7 @@
 /**
- * Sidebar.jsx — RE-FIXED WITH INTERACTIVE TEAM FOLDERS & MONTH ACCORDIONS
+ * Sidebar.jsx — FIXED COLLAPSIBLE TEAM FOLDERS
  */
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { Folder, Plus, ChevronRight, Settings, Users, ShieldAlert, BarChart3, LayoutDashboard, FolderPlus, Calendar } from 'lucide-react'
 import { useDash } from '../contexts/DashboardContext.jsx'
 import * as Modals from './modals/FolderModal.jsx' 
@@ -59,11 +59,21 @@ export default function Sidebar() {
 
   const [modalOpen, setModalOpen] = useState(false)
   
-  // 🛠️ STATE BARU: Melacak folder tim mana saja yang sedang terbuka dropdown-nya
+  // State melacak folder tim mana saja yang terbuka dropdown-nya
   const [openTeams, setOpenTeams] = useState({})
   
   // State melacak status buka/tutup dropdown bulan
   const [openMonths, setOpenMonths] = useState({})
+
+  // ✨ OTOMATIS BUKA TIM AKTIF SAAT PERTAMA KALI KELUAR
+  useEffect(() => {
+    if (activeTeam) {
+      setOpenTeams(prev => ({
+        ...prev,
+        [String(activeTeam)]: true
+      }))
+    }
+  }, [activeTeam])
 
   const getMonthName = (monthStr) => {
     const months = {
@@ -113,7 +123,7 @@ export default function Sidebar() {
     return finalSortedGroups
   }, [activities])
 
-  // 🛠️ FUNGSI BARU: Toggle buka/tutup folder tim sekaligus set active team
+  // Toggle buka/tutup folder tim sekaligus set active team
   const handleTeamClick = (teamId) => {
     const tIdStr = String(teamId)
     
@@ -122,7 +132,7 @@ export default function Sidebar() {
     if (typeof selectDate === 'function') selectDate(null)
     if (typeof setSelPIC === 'function') setSelPIC(null)
 
-    // 2. Toggle status expand/collapse folder lokal
+    // 2. Toggle status expand/collapse folder lokal secara independen
     setOpenTeams(prev => ({
       ...prev,
       [tIdStr]: !prev[tIdStr]
@@ -177,15 +187,16 @@ export default function Sidebar() {
               teams.map((t) => {
                 const tIdStr = String(t.id)
                 const isActive = t.id === activeTeam
-                // Folder dianggap terbuka jika state openTeams bernilai true ATAU folder tersebut sedang aktif diklik
-                const isTeamOpen = !!openTeams[tIdStr] || isActive
+                
+                // 🛠️ FIX DI SINI: Singkirkan `|| isActive` agar murni dikontrol oleh state klik user
+                const isTeamOpen = !!openTeams[tIdStr]
                 
                 const targetedIcon = t.icon || t.iconName || 'Folder'
                 const teamDates = allStructuredDates[tIdStr] || {}
 
                 return (
                   <div key={t.id} className="space-y-1">
-                    {/* BUTTON UTAMA FOLDER TIM (SEKARANG INTERAKTIF) */}
+                    {/* BUTTON UTAMA FOLDER TIM */}
                     <button
                       type="button"
                       onClick={() => handleTeamClick(t.id)}
@@ -202,7 +213,6 @@ export default function Sidebar() {
                         </span>
                         <span className="truncate">{t.name}</span>
                       </div>
-                      {/* Ikon Chevron berputar menyesuaikan status isTeamOpen */}
                       <ChevronRight 
                         size={12} 
                         className={cn(
@@ -213,7 +223,7 @@ export default function Sidebar() {
                       />
                     </button>
 
-                    {/* DROPDOWN SUB-MENU BULAN: Hanya merender komponen jika isTeamOpen bernilai TRUE */}
+                    {/* DROPDOWN SUB-MENU BULAN */}
                     {isTeamOpen && Object.keys(teamDates).length > 0 && (
                       <div className="pl-4 ml-3 border-l border-slate-800/60 space-y-1 pt-1 pb-2">
                         {Object.keys(teamDates).map(monthKey => {
