@@ -5,8 +5,8 @@ import React, { useState, useMemo, useEffect } from 'react'
 import { Folder, Plus, ChevronRight, Settings, Users, ShieldAlert, BarChart3, LayoutDashboard, FolderPlus, Calendar, Trash2, AlertTriangle } from 'lucide-react'
 import { useDash } from '../contexts/DashboardContext.jsx'
 import * as Modals from './modals/FolderModal.jsx' 
-import Modal from '../ui/Modal.jsx'
-import Btn from '../ui/Btn.jsx'
+import Modal from './ui/Modal.jsx'
+import Btn from './ui/Btn.jsx'
 import { cn } from '../constants/helpers.js'
 
 function renderFolderIcon(iconTarget) {
