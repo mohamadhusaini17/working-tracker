@@ -1,5 +1,5 @@
 /**
- * ActivityTable.jsx — KODE FINAL LENGKAP & DINAMIS (OTOMATIS MEMBACA EMAIL USER GOOGLE)
+ * ActivityTable.jsx — KODE FINAL LENGKAP WITH PREFERENCES INTEGRATION
  */
 import React, { useState, useMemo } from 'react'
 import { Search, Plus, ArrowUpDown, Pencil, Trash2, FileText, File, FileSpreadsheet, FileIcon, Activity, Calendar, RefreshCw } from 'lucide-react'
@@ -41,19 +41,16 @@ function SortBtn({ col, label, sortCol, sortDir, onSort }) {
   )
 }
 
-// 🔄 KOMPONEN INTI TOMBOL SINKRONISASI GOOGLE CALENDAR (DINAMIS EMAIL)
 function GoogleSyncButton({ teamId, setToast }) {
   const { syncGoogleCalendar, loading } = useDash()
 
   const handleGoogleLogin = useGoogleLogin({
-    // Menambahkan scope userinfo.email agar diizinkan mengambil email profil pengguna
     scope: 'https://www.googleapis.com/auth/calendar.events.readonly https://www.googleapis.com/auth/userinfo.email',
     onSuccess: async (tokenResponse) => {
       if (tokenResponse && tokenResponse.access_token) {
         console.log('🔑 Google Access Token Berhasil Didapat:', tokenResponse.access_token)
         
         try {
-          // 📡 Ambil data profil (email) dari Google API berdasarkan access_token
           const profileResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
             headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
           })
@@ -66,7 +63,6 @@ function GoogleSyncButton({ teamId, setToast }) {
           const dynamicUserEmail = profileData.email
           console.log('📧 Sinkronisasi sukses menggunakan email akun:', dynamicUserEmail)
           
-          // Mengirimkan email asli pemilik akun ke fungsi Supabase
           const result = await syncGoogleCalendar(teamId, tokenResponse.access_token, dynamicUserEmail)
           setToast(result.message)
         } catch (apiErr) {
@@ -97,7 +93,8 @@ function GoogleSyncButton({ teamId, setToast }) {
 }
 
 export default function ActivityTable({ activities = [], teamId }) {
-  const { addAct, editAct, deleteAct, updateDoc, selDate } = useDash()
+  // 1. Ambil preferensi 'prefCompact' dan 'prefHighlightP0' dari DashboardContext
+  const { addAct, editAct, deleteAct, updateDoc, selDate, prefCompact, prefHighlightP0 } = useDash()
 
   const [q,        setQ]        = useState('')
   const [sortCol,  setSortCol]  = useState(null)
@@ -157,7 +154,7 @@ export default function ActivityTable({ activities = [], teamId }) {
       }
     } catch (err) {
       console.error(err)
-      setToast('❌ Gagal menyimpan data')
+      Toast('❌ Gagal menyimpan data')
     }
   }
 
@@ -302,12 +299,12 @@ export default function ActivityTable({ activities = [], teamId }) {
               <thead>
                 <tr className="tbl-header">
                   {TH_COLS.map(([col, lbl]) => (
-                    <th key={col} className="px-4 py-3 text-left" style={col === 'kegiatan' ? { minWidth: '200px' } : {}}>
+                    <th key={col} className={cn("text-left font-bold text-slate-500 uppercase", prefCompact ? "px-3 py-1.5 text-[11px]" : "px-4 py-3 text-xs")} style={col === 'kegiatan' ? { minWidth: '200px' } : {}}>
                       <SortBtn col={col} label={lbl} sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
                     </th>
                   ))}
-                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase">Dok.</th>
-                  <th className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">Aksi</th>
+                  <th className={cn("text-left font-bold text-slate-500 uppercase", prefCompact ? "px-3 py-1.5 text-[11px]" : "px-4 py-3 text-xs")}>Dok.</th>
+                  <th className={cn("text-right font-bold text-slate-500 uppercase", prefCompact ? "px-3 py-1.5 text-[11px]" : "px-4 py-3 text-xs")}>Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -322,32 +319,45 @@ export default function ActivityTable({ activities = [], teamId }) {
                     year: 'numeric'
                   }) : '-'
 
+                  // Cek apakah item ini prioritasnya P0
+                  const isP0 = a.priority === 'P0' || a.priority?.includes('P0')
+
                   return (
-                    <tr key={a.id} className="tbl-row group">
-                      <td className="px-4 py-3 font-mono text-slate-400 text-xs">{a.jamMulai || '-'}</td>
-                      <td className="px-4 py-3 font-mono text-slate-400 text-xs">{a.jamSelesai || '-'}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">
+                    <tr 
+                      key={a.id} 
+                      className={cn(
+                        "tbl-row group border-b border-slate-800/40 transition-all duration-150",
+                        // 2. HIGHLIGHT PRIORITAS P0: Jika diaktifkan dan baris bernilai P0, beri style merah tipis
+                        (prefHighlightP0 && isP0) 
+                          ? "bg-red-500/5 hover:bg-red-500/10 border-l-2 border-l-red-500" 
+                          : "hover:bg-slate-800/30"
+                      )}
+                    >
+                      {/* 3. MODE COMPACT: Mengatur padding sel secara kondisional */}
+                      <td className={cn("font-mono text-slate-400 text-xs", prefCompact ? "px-3 py-1.5" : "px-4 py-3")}>{a.jamMulai || '-'}</td>
+                      <td className={cn("font-mono text-slate-400 text-xs", prefCompact ? "px-3 py-1.5" : "px-4 py-3")}>{a.jamSelesai || '-'}</td>
+                      <td className={cn("whitespace-nowrap", prefCompact ? "px-3 py-1.5" : "px-4 py-3")}>
                         <div className="flex items-center gap-1.5 text-slate-400 text-xs font-medium">
                           <Calendar size={12} className="text-slate-600" />
                           <span>{formattedDate}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className={prefCompact ? "px-3 py-1.5" : "px-4 py-3"}>
                         <div className="flex items-center gap-2">
                           <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white font-black" style={{ backgroundColor: picHue(a.pic || 'A'), fontSize: '9px' }}>{picInit(a.pic || 'A')}</div>
                           <span className="text-xs text-slate-400 truncate max-w-24">{(a.pic || '').split('@')[0]}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className={prefCompact ? "px-3 py-1.5" : "px-4 py-3"}>
                         <span className={cn('inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-semibold', PRIORITY_CLS[a.priority])}>{a.priority}</span>
                       </td>
-                      <td className="px-4 py-3"><span className="text-slate-200 text-xs block max-w-56 line-clamp-2">{a.kegiatan}</span></td>
-                      <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{a.kategoriKerja}</td>
-                      <td className="px-4 py-3">
+                      <td className={prefCompact ? "px-3 py-1.5" : "px-4 py-3"}><span className="text-slate-200 text-xs block max-w-56 line-clamp-2">{a.kegiatan}</span></td>
+                      <td className={cn("text-slate-500 text-xs whitespace-nowrap", prefCompact ? "px-3 py-1.5" : "px-4 py-3")}>{a.kategoriKerja}</td>
+                      <td className={prefCompact ? "px-3 py-1.5" : "px-4 py-3"}>
                         <span className={cn('inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-semibold', STATUS_CLS[a.status])}>{a.status}</span>
                       </td>
-                      <td className="px-4 py-3"><ProgBar v={a.progress} /></td>
-                      <td className="px-4 py-3">
+                      <td className={prefCompact ? "px-3 py-1.5" : "px-4 py-3"}><ProgBar v={a.progress} /></td>
+                      <td className={prefCompact ? "px-3 py-1.5" : "px-4 py-3"}>
                         <div className="flex gap-1 flex-wrap">
                           {a.documents && Object.entries(a.documents).map(([dt, doc]) => (
                             <Tip key={dt} label={doc?.uploaded ? `Preview: ${doc.name}` : `Upload ${dt.toUpperCase()}`}>
@@ -362,7 +372,7 @@ export default function ActivityTable({ activities = [], teamId }) {
                           ))}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className={prefCompact ? "px-3 py-1.5" : "px-4 py-3"}>
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Tip label="Edit"><Btn variant="ghost" size="icon-sm" onClick={() => openEdit(a)}><Pencil size={14} /></Btn></Tip>
                           <Tip label="Hapus"><Btn variant="ghost" size="icon-sm" onClick={() => openDel(a)}><Trash2 size={14} /></Btn></Tip>

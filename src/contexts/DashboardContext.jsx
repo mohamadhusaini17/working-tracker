@@ -1,5 +1,5 @@
 /**
- * DashboardContext.jsx — SINKRONISASI DATABASE RELASIONAL
+ * DashboardContext.jsx — SINKRONISASI DATABASE RELASIONAL & PREFERENSI GLOBAL
  */
 import { createContext, useContext, useState, useMemo, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
@@ -24,6 +24,28 @@ export function DashboardProvider({ children }) {
   const [selPIC,     setSelPIC]    = useState(null)
   const [loading,    setLoading]   = useState(true)
 
+  // ── PREFERENSI GLOBAL LAYOUT & NOTIFIKASI (INTEGRASI LOCALSTORAGE) ──
+  const [prefNotif, setPrefNotif] = useState(() => {
+    return localStorage.getItem('pref_notif') !== 'false' // Default: true
+  })
+  const [prefCompact, setPrefCompact] = useState(() => {
+    return localStorage.getItem('pref_compact') === 'true' // Default: false
+  })
+  const [prefHighlightP0, setPrefHighlightP0] = useState(() => {
+    return localStorage.getItem('pref_highlight_p0') !== 'false' // Default: true
+  })
+  const [prefDefView, setPrefDefView] = useState(() => {
+    return localStorage.getItem('pref_def_view') || 'all' // Default: 'all'
+  })
+
+  // Sinkronisasi otomatis state preferensi ke browser storage
+  useEffect(() => {
+    localStorage.setItem('pref_notif', prefNotif)
+    localStorage.setItem('pref_compact', prefCompact)
+    localStorage.setItem('pref_highlight_p0', prefHighlightP0)
+    localStorage.setItem('pref_def_view', prefDefView)
+  }, [prefNotif, prefCompact, prefHighlightP0, prefDefView])
+
   // ── 1. FETCH AWAL (MENGGUNAKAN RELASI JOIN TABEL) ─────────────────
   useEffect(() => {
     const fetchTeamsAndActivities = async () => {
@@ -46,7 +68,8 @@ export function DashboardProvider({ children }) {
               progress: progress_percentage,
               kategoriKerja: work_category,
               date: activity_date,
-              document_url
+              document_url,
+              due_date
             )
           `)
           .order('id', { ascending: true })
@@ -60,6 +83,8 @@ export function DashboardProvider({ children }) {
             iconName: cleanIconToString(team.icon),
             activities: (team.activities || []).map(a => ({
               ...a,
+              // Jaga kompatibilitas jika due_date belum ada di record database lama
+              dueDate: a.due_date || a.date, 
               jamMulai: a.jamMulai ? a.jamMulai.substring(0, 5) : '08:00',
               jamSelesai: a.jamSelesai ? a.jamSelesai.substring(0, 5) : '17:00',
               documents: a.document_url ? {
@@ -74,7 +99,14 @@ export function DashboardProvider({ children }) {
           }))
 
           setTeams(sanitized)
-          if (sanitized[0]) setActiveTeam(sanitized[0].id)
+          
+          // Mengikuti Tampilan Default dari Preferensi Settings
+          const savedDefView = localStorage.getItem('pref_def_view') || 'all'
+          if (sanitized[0] && savedDefView === 'all') {
+            setActiveTeam(sanitized[0].id)
+          } else if (sanitized[0]) {
+            setActiveTeam(sanitized[0].id)
+          }
         } else {
           setTeams([])
         }
@@ -211,7 +243,8 @@ export function DashboardProvider({ children }) {
           description: newAct.kegiatan,
           work_category: newAct.kategoriKerja,
           status: newAct.status,
-          progress_percentage: parseInt(newAct.progress) || 0
+          progress_percentage: parseInt(newAct.progress) || 0,
+          due_date: newAct.dueDate || newAct.date
         }])
         .select()
         .single()
@@ -229,6 +262,7 @@ export function DashboardProvider({ children }) {
         progress: data.progress_percentage,
         kategoriKerja: data.work_category,
         date: data.activity_date,
+        dueDate: data.due_date || data.activity_date,
         documents: { csv: { name: '', uploaded: false }, doc: { name: '', uploaded: false }, pdf: { name: '', uploaded: false }, excel: { name: '', uploaded: false } }
       }
 
@@ -244,6 +278,7 @@ export function DashboardProvider({ children }) {
       if (updatedData.kegiatan) mappedUpdate.description = updatedData.kegiatan
       if (updatedData.priority) mappedUpdate.priority = updatedData.priority
       if (updatedData.progress !== undefined) mappedUpdate.progress_percentage = parseInt(updatedData.progress)
+      if (updatedData.dueDate) mappedUpdate.due_date = updatedData.dueDate
 
       const { error } = await supabase.from('activities').update(mappedUpdate).eq('id', actId)
       if (error) throw error
@@ -252,7 +287,7 @@ export function DashboardProvider({ children }) {
         ...t,
         activities: t.activities.map(a => a.id === actId ? { ...a, ...updatedData } : a)
       } : t))
-    } catch (err) { console.error('editAct error:', err.message) }
+    } catch (err) catch (err) { console.error('editAct error:', err.message) }
   }
 
   const deleteAct = async (teamId, actId) => {
@@ -303,7 +338,6 @@ export function DashboardProvider({ children }) {
         return { success: true, message: 'Semua jadwal meeting Anda sudah tersinkronisasi.' }
       }
 
-      // Simpan satu-persatu ke baris database activities
       for (const act of filteredNewActivities) {
         await addAct(teamId, act)
       }
@@ -330,6 +364,11 @@ export function DashboardProvider({ children }) {
   const value = {
     teams, setTeams, activeTeam, setActiveTeam, selDate, setSelDate, selPIC, setSelPIC, loading, activities,
     selectDate, selectTeam, addTeam, editTeam, deleteTeam, allPICs, getTeam, getActsByDate, getPICs, getStats, addAct, editAct, deleteAct, updateDoc, syncGoogleCalendar, 
+    // State Preferensi Global Baru ekspor ke komponen luar
+    prefNotif, setPrefNotif,
+    prefCompact, setPrefCompact,
+    prefHighlightP0, setPrefHighlightP0,
+    prefDefView, setPrefDefView
   }
 
   return <DashCtx.Provider value={value}>{children}</DashCtx.Provider>

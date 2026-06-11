@@ -46,14 +46,18 @@ function ensureString(iconVal) {
 }
 
 export default function SettingsModal({ open, onClose }) {
-  const { teams, editTeam, getPICs, deleteAct } = useDash()
+  const { 
+    teams, 
+    editTeam, 
+    getPICs, 
+    deleteAct,
+    // Menggunakan state preferensi global dari DashboardContext
+    prefNotif, setPrefNotif,
+    prefCompact, setPrefCompact,
+    prefHighlightP0, setPrefHighlightP0,
+    prefDefView, setPrefDefView
+  } = useDash()
   
-  // Preferensi bawaan (tidak diganggu)
-  const [notif,   setNotif]   = useState(true)
-  const [compact, setCompact] = useState(false)
-  const [showP0,  setShowP0]  = useState(true)
-  const [defView, setDefView] = useState('all')
-
   // State Baru untuk Kelola Folder Tim & Personel
   const [selectedTeamId, setSelectedTeamId] = useState('')
   const [teamName, setTeamName] = useState('')
@@ -136,7 +140,7 @@ export default function SettingsModal({ open, onClose }) {
     >
       <div className="flex flex-col gap-5 max-h-[70vh] overflow-y-auto pr-1">
         
-        {/* ─── BARU: MANAJEMEN UTAMA TEAM FOLDER & PERSONEL ─── */}
+        {/* ─── MANAJEMEN UTAMA TEAM FOLDER & PERSONEL ─── */}
         <div className="card p-4 border border-blue-500/10 bg-slate-900/30 rounded-xl space-y-4">
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-blue-400 mb-2">Manajemen Utama Team Folder</p>
@@ -218,7 +222,6 @@ export default function SettingsModal({ open, onClose }) {
                           type="button"
                           onClick={() => {
                             if (confirm(`Hapus seluruh penugasan aktivitas untuk PIC "${person.pic}" di tim ini?`)) {
-                              // Menghapus seluruh aktivitas terkait PIC ini di dalam folder terpilih secara berantai
                               person.acts.forEach(act => deleteAct(selectedTeamId, act.id));
                             }
                           }}
@@ -236,7 +239,7 @@ export default function SettingsModal({ open, onClose }) {
           )}
         </div>
 
-        {/* Info (Bawaan, aman) */}
+        {/* Info */}
         <div className="card p-4">
           <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-3">Info Dashboard</p>
           <div className="flex flex-col gap-2.5">
@@ -249,25 +252,44 @@ export default function SettingsModal({ open, onClose }) {
           </div>
         </div>
 
-        {/* Preferences (Bawaan, aman) */}
+        {/* Preferensi Terhubung ke Context Global */}
         <div>
           <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-1">Preferensi</p>
-          <Row label="Notifikasi Aktivitas" desc="Tampilkan alert untuk aktivitas P0 baru" val={notif} set={setNotif} />
-          <Row label="Mode Compact" desc="Kurangi padding & ukuran elemen" val={compact} set={setCompact} />
-          <Row label="Highlight Prioritas P0" desc="Tandai baris P0 dengan aksen merah" val={showP0} set={setShowP0} />
+          <Row 
+            label="Notifikasi Aktivitas" 
+            desc="Alert untuk prioritas P0 & aktivitas mendekati Due Date" 
+            val={prefNotif} 
+            set={setPrefNotif} 
+          />
+          <Row 
+            label="Mode Compact" 
+            desc="Kurangi padding & ukuran elemen" 
+            val={prefCompact} 
+            set={setPrefCompact} 
+          />
+          <Row 
+            label="Highlight Prioritas P0" 
+            desc="Tandai baris P0 dengan aksen merah" 
+            val={prefHighlightP0} 
+            set={setPrefHighlightP0} 
+          />
         </div>
 
-        {/* Default view (Bawaan, aman) */}
+        {/* Tampilan Default Terhubung ke Context Global */}
         <div>
           <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-2">Tampilan Default</p>
           <div className="grid grid-cols-3 gap-2">
-            {[['all', 'Semua'], ['date', 'Per Tanggal'], ['pic', 'Per PIC']].map(([v, l]) => (
+            {[
+              ['all', 'Semua'], 
+              ['date', 'Per Tanggal'], 
+              ['pic', 'Per PIC']
+            ].map(([v, l]) => (
               <button
                 key={v}
-                onClick={() => setDefView(v)}
+                onClick={() => setPrefDefView(v)}
                 className={cn(
                   'py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer',
-                  defView === v ? 'bg-blue-600 border-blue-500 text-white' : 'btn-outline'
+                  prefDefView === v ? 'bg-blue-600 border-blue-500 text-white' : 'btn-outline'
                 )}
               >
                 {l}
@@ -276,7 +298,7 @@ export default function SettingsModal({ open, onClose }) {
           </div>
         </div>
 
-        {/* Danger zone (Bawaan, aman) */}
+        {/* Danger zone */}
         <div className="rounded-xl p-4" style={{ background: 'rgba(239,68,68,.05)', border: '1px solid rgba(239,68,68,.2)' }}>
           <p className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-1">Zona Berbahaya</p>
           <p className="text-xs text-slate-600 mb-3">Tindakan ini tidak dapat dibatalkan.</p>

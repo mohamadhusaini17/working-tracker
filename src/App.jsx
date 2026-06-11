@@ -16,11 +16,12 @@ import Login from './components/Auth.jsx' // 🛡️ Diarahkan langsung ke folde
 import { cn, fmtLong } from './constants/helpers.js'
 
 function DashboardContent({ onMenu, userSession }) {
+  // 1. Mengambil preferensi tampilan default 'prefDefView' dari DashboardContext
   const {
     activeTeam, selDate, selPIC,
     setSelPIC, selectDate,
     getTeam, getActsByDate, getPICs, getStats,
-    loading,
+    loading, prefDefView
   } = useDash()
 
   const [editMode, setEditMode] = useState(false)
@@ -31,14 +32,34 @@ function DashboardContent({ onMenu, userSession }) {
     return getPICs(activeTeam, selDate || null) || []
   }, [selDate, activeTeam, getPICs])
 
+  // 2. Filter data secara dinamis berdasarkan preferensi 'prefDefView' dari modal settings
   const tableActs = useMemo(() => {
     if (!team) return []
-    const baseActs = getActsByDate(activeTeam, selDate || null) || []
+    
+    // Ambil data dasar berdasarkan tanggal terpilih jika ada
+    let baseActs = getActsByDate(activeTeam, selDate || null) || []
+    
+    // Jika user menyaring berdasarkan PIC tertentu (melalui klik Personnel Breakdown)
     if (selPIC) {
       return baseActs.filter(a => a?.pic === selPIC)
     }
-    return baseActs
-  }, [team, selDate, selPIC, activeTeam, getActsByDate])
+
+    // Tanggal hari ini untuk pembanding filter 'Per Tanggal'
+    const hariIni = new Date().toISOString().split('T')[0]
+    
+    switch (prefDefView) {
+      case 'date':
+        // Hanya tampilkan aktivitas yang dijadwalkan hari ini
+        return baseActs.filter(a => a?.date === hariIni)
+      case 'pic':
+        // Hanya tampilkan aktivitas yang memiliki penugasan PIC (email valid)
+        return baseActs.filter(a => a?.pic && a.pic.includes('@'))
+      case 'all':
+      default:
+        // Tampilkan semua aktivitas dari tim tanpa filter tambahan
+        return baseActs
+    }
+  }, [team, selDate, selPIC, activeTeam, getActsByDate, prefDefView]) // prefDefView masuk ke dependency array
 
   if (loading) {
     return (
