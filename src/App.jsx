@@ -11,7 +11,7 @@ import StatCards from './components/StatCards.jsx'
 import DashboardCharts from './components/DashboardCharts.jsx'
 import ActivityTable from './components/ActivityTable.jsx'
 import PICCard from './components/PICCard.jsx'
-import Login from './components/Auth.jsx' 
+import Login from './pages/Login.jsx' // 🛡️ JALUR SUDAH DIPERBAIKI KE FOLDER PAGES
 import { cn, fmtLong } from './constants/helpers.js'
 
 function DashboardContent({ onMenu, userSession }) {
@@ -158,7 +158,7 @@ function DashboardContent({ onMenu, userSession }) {
           </div>
         )}
 
-        {/* TABEL AKTIVITAS (Menggunakan HTML div Container Standar Dashboard) */}
+        {/* TABEL AKTIVITAS */}
         {team && showTable && (
           <div className={cn('p-5 relative border border-slate-800 rounded-2xl bg-slate-900/20 backdrop-blur-sm shadow-xl', editMode && 'ring-2 ring-blue-500/30 ring-dashed')}>
             {editMode && (
