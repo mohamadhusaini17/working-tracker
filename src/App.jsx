@@ -3,7 +3,7 @@
  */
 import React, { useState, useMemo, useEffect } from 'react'
 import { ChevronRight, Users, GripVertical, FolderArchive } from 'lucide-react'
-import { supabase } from './lib/supabase' // 🛡️ Import instance supabase Anda
+import { supabase } from './lib/supabase' 
 import { DashboardProvider, useDash } from './contexts/DashboardContext.jsx'
 import Sidebar from './components/Sidebar.jsx'
 import Header from './components/Header.jsx'
@@ -11,12 +11,10 @@ import StatCards from './components/StatCards.jsx'
 import DashboardCharts from './components/DashboardCharts.jsx'
 import ActivityTable from './components/ActivityTable.jsx'
 import PICCard from './components/PICCard.jsx'
-import Card from './components/ui/Card.jsx'
-import Login from './components/Auth.jsx' // 🛡️ Diarahkan langsung ke folder src/components/Auth.jsx
+import Login from './components/Auth.jsx' 
 import { cn, fmtLong } from './constants/helpers.js'
 
 function DashboardContent({ onMenu, userSession }) {
-  // 1. Mengambil preferensi tampilan default 'prefDefView' dari DashboardContext
   const {
     activeTeam, selDate, selPIC,
     setSelPIC, selectDate,
@@ -32,34 +30,28 @@ function DashboardContent({ onMenu, userSession }) {
     return getPICs(activeTeam, selDate || null) || []
   }, [selDate, activeTeam, getPICs])
 
-  // 2. Filter data secara dinamis berdasarkan preferensi 'prefDefView' dari modal settings
+  // Filter data secara dinamis berdasarkan preferensi 'prefDefView' dari modal settings
   const tableActs = useMemo(() => {
     if (!team) return []
     
-    // Ambil data dasar berdasarkan tanggal terpilih jika ada
     let baseActs = getActsByDate(activeTeam, selDate || null) || []
     
-    // Jika user menyaring berdasarkan PIC tertentu (melalui klik Personnel Breakdown)
     if (selPIC) {
       return baseActs.filter(a => a?.pic === selPIC)
     }
 
-    // Tanggal hari ini untuk pembanding filter 'Per Tanggal'
     const hariIni = new Date().toISOString().split('T')[0]
     
     switch (prefDefView) {
       case 'date':
-        // Hanya tampilkan aktivitas yang dijadwalkan hari ini
         return baseActs.filter(a => a?.date === hariIni)
       case 'pic':
-        // Hanya tampilkan aktivitas yang memiliki penugasan PIC (email valid)
         return baseActs.filter(a => a?.pic && a.pic.includes('@'))
       case 'all':
       default:
-        // Tampilkan semua aktivitas dari tim tanpa filter tambahan
         return baseActs
     }
-  }, [team, selDate, selPIC, activeTeam, getActsByDate, prefDefView]) // prefDefView masuk ke dependency array
+  }, [team, selDate, selPIC, activeTeam, getActsByDate, prefDefView])
 
   if (loading) {
     return (
@@ -166,9 +158,9 @@ function DashboardContent({ onMenu, userSession }) {
           </div>
         )}
 
-        {/* TABEL AKTIVITAS */}
+        {/* TABEL AKTIVITAS (Menggunakan HTML div Container Standar Dashboard) */}
         {team && showTable && (
-          <Card className={cn('p-5 relative border border-slate-800', editMode && 'ring-2 ring-blue-500/30 ring-dashed')}>
+          <div className={cn('p-5 relative border border-slate-800 rounded-2xl bg-slate-900/20 backdrop-blur-sm shadow-xl', editMode && 'ring-2 ring-blue-500/30 ring-dashed')}>
             {editMode && (
               <div className="absolute -top-2 -left-2 bg-blue-600 rounded-full p-1 shadow-md">
                 <GripVertical size={12} className="text-white" />
@@ -185,7 +177,7 @@ function DashboardContent({ onMenu, userSession }) {
               </h2>
             </div>
             <ActivityTable activities={tableActs} teamId={activeTeam} userSession={userSession} />
-          </Card>
+          </div>
         )}
 
         {/* FLOATING EDIT BADGE */}
@@ -219,13 +211,11 @@ export default function App() {
   const [initializing, setInitializing] = useState(true)
 
   useEffect(() => {
-    // Ambil sesi aktif saat pertama kali aplikasi dibuka
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setInitializing(false)
     })
 
-    // Dengarkan perubahan status login/logout secara realtime
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
     })
@@ -241,12 +231,10 @@ export default function App() {
     )
   }
 
-  // Jika tidak ada sesi login, tampilkan halaman Login bawaan (Auth.jsx)
   if (!session) {
     return <Login />
   }
 
-  // Jika sudah login, tampilkan seluruh Dashboard Provider utama Anda
   return (
     <DashboardProvider>
       <AppShell userSession={session} />
