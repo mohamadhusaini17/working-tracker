@@ -3,7 +3,7 @@
  */
 import React, { useState, useMemo, useEffect } from 'react'
 import { ChevronRight, Users, GripVertical, FolderArchive } from 'lucide-react'
-import { supabase } from './lib/supabase' 
+import { supabase } from './lib/supabase' // 🛡️ Import instance supabase Anda
 import { DashboardProvider, useDash } from './contexts/DashboardContext.jsx'
 import Sidebar from './components/Sidebar.jsx'
 import Header from './components/Header.jsx'
@@ -11,10 +11,12 @@ import StatCards from './components/StatCards.jsx'
 import DashboardCharts from './components/DashboardCharts.jsx'
 import ActivityTable from './components/ActivityTable.jsx'
 import PICCard from './components/PICCard.jsx'
-import Login from './pages/Login.jsx' // 🛡️ JALUR SUDAH DIPERBAIKI KE FOLDER PAGES
+import Card from './components/ui/Card.jsx'
+import Login from './components/Auth.jsx' // 🛡️ DIKEMBALIKAN KE JALUR ASLI REPOSITORIMU
 import { cn, fmtLong } from './constants/helpers.js'
 
 function DashboardContent({ onMenu, userSession }) {
+  // Hanya mengambil prefDefView dari context untuk fitur preferensi
   const {
     activeTeam, selDate, selPIC,
     setSelPIC, selectDate,
@@ -30,16 +32,19 @@ function DashboardContent({ onMenu, userSession }) {
     return getPICs(activeTeam, selDate || null) || []
   }, [selDate, activeTeam, getPICs])
 
-  // Filter data secara dinamis berdasarkan preferensi 'prefDefView' dari modal settings
+  // FOKUS IMPROVEMENT: Hanya memodifikasi filter data tableActs sesuai preferensi user
   const tableActs = useMemo(() => {
     if (!team) return []
     
+    // Ambil data dasar berdasarkan tanggal terpilih jika ada
     let baseActs = getActsByDate(activeTeam, selDate || null) || []
     
+    // Jika user sedang memfilter berdasarkan PIC tertentu dari breakdown card
     if (selPIC) {
       return baseActs.filter(a => a?.pic === selPIC)
     }
 
+    // Jalankan preferensi default view dari settings modal
     const hariIni = new Date().toISOString().split('T')[0]
     
     switch (prefDefView) {
@@ -160,7 +165,7 @@ function DashboardContent({ onMenu, userSession }) {
 
         {/* TABEL AKTIVITAS */}
         {team && showTable && (
-          <div className={cn('p-5 relative border border-slate-800 rounded-2xl bg-slate-900/20 backdrop-blur-sm shadow-xl', editMode && 'ring-2 ring-blue-500/30 ring-dashed')}>
+          <Card className={cn('p-5 relative border border-slate-800', editMode && 'ring-2 ring-blue-500/30 ring-dashed')}>
             {editMode && (
               <div className="absolute -top-2 -left-2 bg-blue-600 rounded-full p-1 shadow-md">
                 <GripVertical size={12} className="text-white" />
@@ -177,7 +182,7 @@ function DashboardContent({ onMenu, userSession }) {
               </h2>
             </div>
             <ActivityTable activities={tableActs} teamId={activeTeam} userSession={userSession} />
-          </div>
+          </Card>
         )}
 
         {/* FLOATING EDIT BADGE */}
@@ -211,11 +216,13 @@ export default function App() {
   const [initializing, setInitializing] = useState(true)
 
   useEffect(() => {
+    // Ambil sesi aktif saat pertama kali aplikasi dibuka
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setInitializing(false)
     })
 
+    // Dengarkan perubahan status login/logout secara realtime
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
     })
@@ -231,10 +238,12 @@ export default function App() {
     )
   }
 
+  // Jika tidak ada sesi login, tampilkan halaman Login bawaan (Auth.jsx)
   if (!session) {
     return <Login />
   }
 
+  // Jika sudah login, tampilkan seluruh Dashboard Provider utama Anda
   return (
     <DashboardProvider>
       <AppShell userSession={session} />
